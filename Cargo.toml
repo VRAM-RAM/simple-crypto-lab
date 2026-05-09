@@ -1,0 +1,22 @@
+
+[workspace]
+resolver = "2"
+
+members = [
+    "simple-ring",
+    "schemes/simple-bfv",
+]
+
+
+[workspace.dependencies]
+rand = "0.8.0"
+rayon = "1.11.0"
+simple-ring = { path = "simple-ring" }
+
+
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+version = "0.1.0"
+authors = ["Olruix (VRAM-RAM)"]
