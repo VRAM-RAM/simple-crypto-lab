@@ -94,7 +94,7 @@ impl Polynomial {
     }
 
     #[cfg(feature = "parallel")]
-    fn polynomial_sum_multi(params: &BFVparams, first: &Self, second: &Self) -> Self { //The multi-thread sum (experimental and not so good...)
+    fn polynomial_sum_multi(params: &RingParams, first: &Self, second: &Self) -> Self { //The multi-thread sum (experimental and not so good...)
         let mut coeffs = vec![0u64; params.n];
         coeffs
             .par_iter_mut()
@@ -106,7 +106,7 @@ impl Polynomial {
     }
 
     #[cfg(feature = "parallel")]
-    fn polynomial_sub_multi(params: &BFVparams, first: &Self, second: &Self) -> Self { //The multi-thread substraction (experimental and not so good...)
+    fn polynomial_sub_multi(params: &RingParams, first: &Self, second: &Self) -> Self { //The multi-thread substraction (experimental and not so good...)
         let mut coeffs = vec![0u64; params.n];
         coeffs
         .par_iter_mut()
@@ -135,7 +135,7 @@ impl Polynomial {
         let q = params.q;
         let coeffs: Vec<u64> = self.coeffs
             .iter()
-            .map(|&coeff| ( - (coeff as i64 )).rem_euclid(q as i64) as u64)
+            .map(|&coeff| ( - (coeff as i128 )).rem_euclid(q as i128) as u64)
             .collect::<Vec<u64>>();
         Polynomial::new(coeffs)
     }
