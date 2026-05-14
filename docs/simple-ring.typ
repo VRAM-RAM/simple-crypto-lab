@@ -1,7 +1,6 @@
 #import "@preview/codly:1.3.0": *
 #import "@preview/codly-languages:0.1.1": *
 #show: codly-init.with()
-
 #set page(
   paper: "a5",
   margin: (x: 1.8cm, y: 1.5cm),
@@ -513,19 +512,810 @@ Then, in  your project :
 use simple_ring::{Polynomial, RingParams, find_valid_omega};
 ```
 
-From this, you can use all the methods defined :
+From this, you can use all the methods defined (code from the lib.rs of simple-ring):
 #codly(languages: codly-languages)
 ```rust
-let params = RingParams::new(4, 17, find_valid_omega(4, 17));
-let mut coeffs = vec![0u64; 4];
-coeffs[3] = 8;
-let poly1 = Polynomial::new(coeffs);
-let poly2 = Polynomial::zeros(4);
-let sum = poly1.sum(&params, &poly2);
-let mul = poly1.mul(&params, &poly2);
-let scaled = poly1.scale(&params, 10);
-let divided = poly1.divide_by_constant(2);
-let reduced = poly1.reduce(2);
-let opposite = poly1.opposite(&params);
-//...
+#[cfg(test)]
+#[test]
+fn test_polynomials() {
+    let params = RingParams::new(4, 17, find_valid_omega(4, 17)); //We define the parameters
+    let mut coeffs = vec![0u64; 4]; //We create the coefficients for our first polynomial
+    coeffs[3] = 8;
+    let poly1 = Polynomial::new(coeffs.clone()); //We create the first polynomial as P1 = [0, 0, 0, 8]
+    let poly2 = Polynomial::zeros(4); //We create an empty polynomial, which will be the second one.
+    let sum = poly1.sum(&params, &poly2); //We execute the defined methods 
+    let mul = poly1.mul(&params, &poly2);
+    let scaled = poly1.scale(&params, 10);
+    let divided = poly1.divide_by_constant(2);
+    let reduced = poly1.reduce(2);
+    let opposite = poly1.opposite(&params);
+    println!();
+    assert_eq!(poly1.coeffs, coeffs.into_boxed_slice()); //We ensure, with all the assert_eqs, that the result is correct.
+    println!("First polynomial : {:?}", poly1);
+    println!();
+    println!("Second polynomial : {:?}", poly2);
+    assert_eq!(poly2.coeffs, vec![0u64; 4].into_boxed_slice());
+    println!();
+    println!("Sum is : {:?}", sum);
+    assert_eq!(poly1.coeffs, sum.coeffs);
+    println!();
+    println!("Product is : {:?}", mul);
+    assert_eq!(poly2.coeffs, mul.coeffs);
+    println!();
+    println!("Scaled first polynomial is : {:?}", scaled);
+    let mut coeffs = vec![0u64; 4];
+    coeffs[3] = (8 * 10) % params.q; //We have to reduce because the scale is done modulo q
+    assert_eq!(coeffs.into_boxed_slice(), scaled.coeffs);
+    println!();
+    println!("Divided first polynomial is : {:?}", divided);
+    let mut coeffs = vec![0u64; 4];
+    coeffs[3] = 8 / 2;
+    assert_eq!(coeffs.into_boxed_slice(), divided.coeffs);
+    println!();
+    println!("Reduced first polynomial is : {:?}", reduced);
+    let mut coeffs = vec![0u64; 4];
+    coeffs[3] = 8 % 2;
+    assert_eq!(coeffs.into_boxed_slice(), reduced.coeffs);
+    println!();
+    println!("Opposite poly1 is : {:?}", opposite);
+    let mut coeffs = vec![0u64; 4];
+    coeffs[3] = (-8 as i64).rem_euclid(params.q as i64) as u64;//We have to reduce because the opposite is done modulo q
+    assert_eq!(coeffs.into_boxed_slice(), opposite.coeffs); 
+    println!();
+}
+```
+
+The output is :
+```
+running 1 test
+
+First polynomial : Polynomial { coeffs: [0, 0, 0, 8] }
+
+Second polynomial : Polynomial { coeffs: [0, 0, 0, 0] }
+
+Sum is : Polynomial { coeffs: [0, 0, 0, 8] }
+
+Product is : Polynomial { coeffs: [0, 0, 0, 0] }
+
+Scaled first polynomial is : Polynomial { coeffs: [0, 0, 0, 12] }
+
+Divided first polynomial is : Polynomial { coeffs: [0, 0, 0, 4] }
+
+Reduced first polynomial is : Polynomial { coeffs: [0, 0, 0, 0] }
+
+Opposite poly1 is : Polynomial { coeffs: [0, 0, 0, 9] }
+
+test test_polynomials ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+\
+So, the polynomial code is done, we can now approach the sampling !
+
+#pagebreak()
+= `sampling.rs` : The coefficient sampling and generation
+\
+In `samplig.rs`, we implement the generation of coefficients for cryptographic implementations.
+
+== The RNG 
+\
+A random number generator (RNG) is primordial in cryptograpy, because if the generated key & noise aren't random (if they are predictable, if they show patterns), the security of LWE is broken. In this project, we've choosen _OsRng_, a random number generator that calls the system generator (`/dev/getrandom` on Linux, for example.). The OS' RNG called is considered as secured because the generated bits depends on physical values like CPU temperature, disk activity, memory used...
+\
+So, the first thing to do, in `samplig.rs`, is to define the use of the RNG :
+#codly(languages: codly-languages)
+```rust
+use crate::{Polynomial, RingParams};
+use rand::{Rng, RngCore, rngs::OsRng};
+```
+\
+== Implementation for coefficient generation
+\
+The first thing to do, for implementing the coefficient generation, is to create a struct `Sample`, that will store the coefficients as integers (negative or positive values) :
+\
+#codly(languages: codly-languages)
+```rust
+#[derive(Clone, Debug)]
+pub struct Sample(pub Vec<i32>);
+
+impl Deref for Sample {
+    type Target = Vec<i32>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+```
+
+This struct provides us some modularity : if we want to use values in $ZZ$, we can use the struct `Sample`. At the moment we need to get this values in the ring $ZZ_q$, we just reduce each coefficient modulo $q$. 
+\
+So, we create a method that implements this transformation :
+#codly(languages: codly-languages)
+```rust
+impl Sample {
+    pub fn to_poly(self, q:u64) -> Polynomial {
+        let coeffs = self.iter().map(|v| (*v).rem_euclid(q as i32) as u64).collect();
+        Polynomial::new(coeffs)
+    }
+}
+```
+\
+=== Generation of coefficients with Centered Binomial Distribution (CBD)
+\
+In theory, we should use a gaussian distribution, but it has 2 major problems :
+
++ The sampling is slow and expensive
++ It's implementation is complicated and source of many errors
+\
+So, we want to use something simpler, but with similar properties.
+Here comes the CBD. We can say that it is a discrete and simple approximation of the gaussian.
+We define a CBD variable as :
+\
+\
+#align(center)[$X = sum_(i=1)^eta b_i - b_i prime$]
+\
+Where $b_i, b_i prime tilde.op {0, 1}$
+\
+\
+Explanation :
+\
+We do the sum of choosen randomly bits, centered on 0, with a base borned in $[-eta, eta]$.
+\
+\
+Example :
+\
+Let's say we want to generate a coefficient, called $c$. With centered binomial distribution :
++ We choose the value of $eta$. Here, for the example, $eta$ = 4.
++ We generate randomly $eta$ bits for $b$ and $b prime$. Here, let's say we have $b = [0, 1, 1, 1]$ and $b prime = [0, 1, 0, 0].$
++ We do the sum of this bits, as $b = 0 + 1 + 1 + 1 = 3$ and $b prime = 0 +1+0+0 = 1$.
++ We compute the difference between $b$ and $b prime$ : $b - b prime$ = 3 - 1 = 2
++ We have generated our coefficient : c = 2.
+
+This method has many good points.
+\
+First, it's really fast : we don't call the generator as much as if we had to implement a gaussian distribution, and the operations are really simple (just a sum and a substraction, trivial for a CPU).
+\
+Also, as $eta$ grows, the distribution approaches from a gaussian#footnote[https://en.wikipedia.org/wiki/De_Moivre%E2%80%93Laplace_theorem] and, finally, the CBD is subgaussian.
+It's the perfect candidate for LWE cryptography, such as CRYSTAL-Kyber#footnote[https://pq-crystals.org/kyber/] or BFV#footnote[please see `/schemes/`].
+\
+\
+Now, let's implement it :
+\
+#codly(languages: codly-languages)
+```rust
+#[inline]
+pub fn generate_cbd_sample(n: usize, eta: usize) -> Sample {
+
+    let mut coeffs = vec![0i32; n]; // So first we create an empty vector which will contain the coefficients.
+
+    let bits_per_coeff = eta; //Then we choose the number of bits for each part (a and b) -> if bit_number == 4, a and be will be the sum of 4 bits, like in the example
+
+    let total_bits = 2 * coeffs.len() * bits_per_coeff; 
+
+    let total_bytes = (total_bits + 7) / 8; 
+
+    let mut rng_buf = vec![0u8; total_bytes];
+
+    OsRng.fill_bytes(&mut rng_buf); //We generate a single vector of u8s of which we will choose the bits.
+    let mut bit_index = 0;
+    for coeff in coeffs.iter_mut() {
+        let mut a = 0;
+        let mut b = 0;
+
+        for _ in 0..bits_per_coeff { //Then we choose the bits in the sequence of bytes generated before. (for example : generated = [00001111; 10101010; ...], then we pick the bits one by one as first bit = 0, second one = 0...)
+            let byte = rng_buf[bit_index / 8];
+            let bit = (byte >> (bit_index % 8)) & 1; 
+            a += bit as u64;
+            bit_index += 1;
+        }
+
+        for _ in 0..bits_per_coeff { //We continue picking
+            let byte = rng_buf[bit_index / 8];
+            let bit = (byte >> (bit_index % 8)) & 1;
+            b += bit as u64;
+            bit_index += 1;
+        }
+
+        *coeff = a as i32 - b as i32; //And we finally do a - b
+    }
+    
+    Sample(coeffs) //We return the generated sample
+}
+```
+\
+=== Generation of small coefficients
+\
+We will also need to generate small coefficients for our schemes. The generated coefficients will be in the alphabet ${-1, 0, 1}$.
+\
+We simply implement it :
+\
+```rust
+#[inline]
+pub fn generate_small_sample(params: &RingParams) -> Sample { 
+    let mut rng = OsRng; 
+    let mut coeffs: Vec<i32> = Vec::with_capacity(params.n);
+    
+    for _ in 0..params.n {
+        let small: i32 = rng.gen_range(-1..=1); //We generate coeffs in the alphabet A = {-1, 0, 1}
+        coeffs.push(small);
+    }
+    
+    Sample(coeffs) //We return the generated sample
+}
+```
+\
+=== Uniform generation of coefficients in the Ring
+\
+Finally, we need to have a function for generating coefficients uniformly, in the entire ring, so in the alphabet ${0, 1, ..., q - 1}$.
+\
+```rust
+#[inline]
+pub fn generate_uniform_polynomial(params: &RingParams) -> Polynomial { 
+    let mut rng = OsRng; //We choose the rng
+    let mut coeffs = Vec::with_capacity(params.n);
+
+    for _ in 0..params.n {
+        let uniform: u64 = rng.gen_range(0..=params.q - 1); // We generate values that are in the ring 
+        coeffs.push(uniform);
+    }
+    Polynomial { coeffs: coeffs.into_boxed_slice() } //This time, we return directly a Polynomial, because we are in the ring.
+}
+```
+\
+We have now finished with the sampling. Now, we will approach the most difficult concept of this implementation : the NTT.
+
+#pagebreak()
+= Deeping into NTT 
+\
+The Number Theoretic Transform is the equivalent of the FFT, but in modular arithmetic : while the FFT is computed on complex numbers and roots of unit as $omega^n = 1$, the NTT works on a finite field (the ring), with integers modulo $q$ and a primitive root modulo $q$.
+
+== The problem
+\
+Let $A(X)$ and $B(X)$ be two polynomials :
+\
+#align(center)[$A(X) = a_0 + a_1 hyph.point X^1 + a_2 hyph.point X^2$]
+#align(center)[$B(X) = b_0 + b_1 hyph.point X^1 + b_2 hyph.point X^2$]
+\
+Multiplying two polynomials has a complexity of $O(n^2)$, which is enormous for large polynomials. So, we are searching for a representation which reduces the complexity of the operation.
+
+== The concept
+\
+The NTT says that we can't only represent a polynomial by their coefficients :
+#align(center)[($a_0, a_1, a_2$)]
+#align(center)[($b_0, b_1, b_2$)]
+\
+But also by the values of the polynomial in some points :
+#align(center)[$(A(omega^0), A(omega^1), A(omega^2))$]
+#align(center)[$(B(omega^0), B(omega^1), B(omega^2))$]
+\
+Where $omega$ is a root of the unit.
+\
+In this representation, we just have to multiply coefficient by coefficient to get the result of the polynomial multiplication.
+
+#pagebreak()
+== The maths behind NTT
+=== What is the root of a unit ?
+\
+In standart arithmetic, a root of the unit is a number $omega$ as, for the unit $n$ :
+#align(center)[$omega^n = 1$]
+\
+For example, for $n = 4$, $omega = i$ because $i^4 = 1$.
+\
+\
+But, in the modular arithmetic (in $ZZ_q$), the root is a number $omega$ as, for the unit $n$ :
+#align(center)[$omega^n eq.triple 1 mod q$]
+\
+For example, for $q = 17$ and $n = 4$, $w = 4$ because $4^4 mod 17 = 256 mod 17 = 1$.
+\
+\
+=== What's a primitive root, and why is it important ?
+\
+A primitive root is a root that "generate" all the other ones.
+A number $w$ is a primitive root if :
+#align(center)[$omega^n eq.triple 1 mod q$]
+#align(center)[$omega^k eq.triple.not 1 mod q$]
+Where $k < n$.
+\
+For example, for  $q = 17$ and $n = 4$, $w = 4$ is a primitive root because :
+#align(center)[$4^1 mod 17 = 4 mod 17 eq.triple 4 eq.triple.not 1$]
+#align(center)[$4^2 mod 17 = 16 mod 17 eq.triple 16 eq.triple.not 1$]
+#align(center)[$4^3 mod 17 = 64 mod 17 eq.triple 13 eq.triple.not 1$]
+#align(center)[$4^4 mod 17 = 256 mod 17 eq.triple 1$]
+\
+Why do we need a primitive root ? 
+\
+Because we need $omega^0 eq.not omega^1 eq.not omega^2 eq.not  ... eq.not omega^(n-1)$.
+\
+Or, if $omega$ isn't a primitive root, some of the values can repeet, and so we loose information.
+
+=== The negacyclic
+\
+In BFV,  work in the ring $ZZ_q [X] slash (X^n + 1)$, which means that $X^n eq.triple -1 mod (X^n + 1)$
+. So, we need $omega^n eq.triple -1 mod q$.
+\
+The solution is to take a 2nth root of the unit, as :
+\
+#align(center)[$omega^(2n) eq.triple 1 mod q => omega^n eq.triple -1 mod q$]
+\
+Because $omega^(2n) = (omega^n)^2 eq.triple 1$, so $omega^n$ is a square root of $1$, and, in the ring, the square roots of $1$ are ${-1, 1}$. If $omega$ is a primitive 2nth root, $omega^n eq.not 1$, so $omega^n eq -1$.
+\
+\
+Now, we introduce the fact that $q eq.triple 1 mod 2n$. Why ? Because a primitive root 2nth of the unit exists in $ZZ_q$ if and *only* if $2n$ divides $(q-1)$.
+\
+\
+For example, if we have $n = 4096$ and $q = 557 057$, it works, because :
+\
+#align(center)[$q - 1 mod 2n = 557 056 mod 8192 eq 0$]
+\
+In that case, $omega$ exists.
+
+\
+== The NTT Transform
+=== The formal definition
+
+This is the formal definition of the NTT :
+\
+Let $a(x)$ be a polynomial of coefficients $[a_0, a_1, ..., a_(n-1)]$.
+\
+The NTT computes :
+#align(center)[$â_i = sum_(j=0)^(n-1) a_j hyph.point omega^(i hyph.point j) mod q$]
+\
+And then returns $[â_0, â_1,..., â_(n-1)]$.
+\
+\For example, with $n = 4, q = 17, omega = 4$, and $a =  [1, 2, 3, 0]$, we have :
+\
+\
+#align(center)[$â_0 = (a_0 hyph.point omega^0 + a_1 hyph.point omega^0 + a_2 hyph.point omega^0 + a_3 hyph.point omega^0 ) mod 17$]
+#align(center)[$â_0 = (1 hyph.point 1 + 2 hyph.point 1 + 3 hyph.point 1 + 0 hyph.point 1) mod 17$]
+#align(center)[$â_0 = 6$]
+\
+\
+#align(center)[$â_1 = (a_0 hyph.point omega^0 + a_1 hyph.point omega^1 + a_2 hyph.point omega^2 + a_3 hyph.point omega^3 ) mod 17$]
+#align(center)[$â_1 = 57 mod 17 = 6$]
+\
+\
+#align(center)[$â_2 = (a_0 hyph.point omega^0 + a_1 hyph.point omega^2 + a_2 hyph.point omega^4 + a_3 hyph.point omega^6 ) mod 17$]
+#align(center)[$â_2 = 36 mod 17 = 2$]
+\
+\
+#align(center)[$â_3 = (a_0 hyph.point omega^0 + a_1 hyph.point omega^3 + a_2 hyph.point omega^6 + a_3 hyph.point omega^9 ) mod 17$]
+#align(center)[$â_3 = 75 mod 17 = 7$]
+\
+\
+The result is here $â = [6, 6, 2, 7]$, we've transform our polynomial into the NTT domain !
+\
+But, there is a problem : the computation cost. As you've seen, we have done, for every $a$, 4 sums and 4 products. So, the complexity is $O(2n^2)$.
+\
+\
+=== The trick to reduce complexity : the butterfly operation 
+\
+As we've seen, the formal definition of the NTT is :
+\
+#align(center)[$â_i = sum_(j=0)^(n-1) a_j hyph.point omega^(i hyph.point j) mod q$]
+\
+The key is to split even and odd indices. For $n= 4$, let's expand the sum and group the terms :
+\
+#align(center)[$â_i = a_0 * omega^0 + a_1 * omega^i + a_2 * omega^(2i) + a_3 * omega^(3i)$]
+\
+We group the indices $(0,2)$ and $(1, 3)$ :
+\
+#align(center)[$â_i = (a_0 * omega^0 + a_2 * omega^(2i)) + (a_1 * omega^(i) + a_3 * omega^(3i))$]
+\
+We factor out $omega^i$ from the odd part (right) :
+\
+#align(center)[$â_i = (a_0 * omega^0 + a_2 * omega^(2i)) + omega^i (a_1 * omega^(0) + a_3 * omega^(2i))$]
+\
+We now define :
+\
+\
+ #align(center)[Evenpart(i) = $a_0*omega^0 + a_2 * omega^(2i)$]
+\
+#align(center)[Oddpart(i) = $a_1*omega^0 + a_3 * omega^(2i)$]
+\
+Therefore :
+#align(center)[$â_i = $ Evenpart(i) + $omega^i *$ Oddpart(i)]
+\
+\
+Then, knowing that $omega^(i+n slash 2) = -omega^i$, we have :
+\
+#align(center)[$â_i = $ Evenpart(i) + $omega^i *$ Oddpart(i)]
+#align(center)[$â_(i+n slash 2) = $ Evenpart(i) - $omega^i *$ Oddpart(i)]
+\
+And so, for two coefficients, we only have to compute the same Evenpart, the same Oddpart. We reduce the complexity by two. By computing $omega^i * $ Oddpart(i) only one time for the two coefficients, we reduce it again, and, by accessing only one index of coefficients $(i)$ for the results of index $i$ and $i + n slash 2$, we reduce the meory cost !
+\
+Why $O( n log n)$ ? Because the butterfly is applied $log_2(n)$ times : 
+#table(
+    columns: 4,
+    [Level], [Butterflies], [Work per Butterfly], [Total Cost],
+    [1], [n/2], [O(1)], [O(n)],
+    [2], [n/2], [O(1)], [O(n)],
+    [...], [...], [...], [...],
+    [$log_2(n)$], [n/2], [O(1)], [O(n)],
+)
+
+In total, we have a cost of $log_2(n) * O(n) = O(n log n)$. For exampe, with $n = 4096$, naively we do $4096² = 16,777,216$ operations, and with the butterflies we do $n slash 2 * log_2(n) = 2048 * 12 = 24,586$ operations, so a gain factor of $tilde 682$. 
+\
+Now, before implementing the NTT code, we will have to implement modular arithmetic functions for searching parameters.
+
+#pagebreak()
+== `modular.rs` : modular arithmetic functions and useful ones for searching parameters.
+\
+=== Finding the parameters
+\
+The first thing to do, for the NTT, is to choose the parameters, as $q mod 2n = 1$ and $omega$ is a primitive 2nth root of $n$. First, let's implement an algorithm for modular exponentiation.
+\
+The concept of the modular exponentiation is that the result of $k^n mod q$ is in our ring, in $[0; q-1]$, so that it doesn't overflow. The problem is that if $k$ and $n$ are enormous, $k^n$ would overflow. The trick is here to avoid computing $k^n$ directly, and to compute $k^n mod q$ step by step.
+\
+Here, instead of doing $k * k *k *... * k$ $n$ times, we use the binary decomposition of the exponent $n$.
+\
+==== Binary decomposition of the exponent
+\
+In binary, the exponent $n$ is written as $n = sum_(j=0)^l b_j hyph.point 2^j$
+\
+Where $b_j in {0, 1}$. 
+\
+\
+For example $n = 13$ is written as 1101 in binary because :
+#align(center)[$1 *2^0 + 0*2^1 + 1*2^2 + 1*2^3 = 1 + 0 + 4 + 8 = 13$] 
+\
+Why 1101 and not 1011 ? Because in binary we write from the most significant bit to the less significant. Since $1*2^0$ is the less significant and $1 * 2^3$ is the most significant, we write it from $1*2^3$ to $1*2^0$, so 1101.
+
+==== Property of the powers, and computation
+We have this property :
+#align(center)[$k^n = k^(sum_(j=0)^l b_j hyph.point 2^j)$]
+#align(center)[$k^n = product_(j=0)^l k^(b_j hyph.point 2^j)$]
+#align(center)[$k^n = product_(j=0)^l (k^(2^j))^(b_j)$]
+\
+The fact is that if $b_j = 0$, $(k^(2^j))^(b hyph.point j) = 1$, so we can ignore this term, and, if $b_j = 1$, we multiply by $k^(2^j)$.
+\
+\
+So, we can calculate $k^(2l)$ in an iterative way :
+#align(center)[$k^(2^0) = k$]
+#align(center)[$k^(2^1) = (k^(2^0))^2 = k^2$]
+#align(center)[$k^(2^2) = (k^(2^1))^2 = k^4$]
+#align(center)[$k^(2^3) = (k^(2^2))^2 =  k^8$]
+#align(center)[$...$]
+\
+Every step, we do : $k = (k * k) mod q$.
+\
+==== The modular exponentiation algorithm
+\
+Because of that property, we can implement a step by step function for mudlar exponentiation in Rust :
+\
+```rust
+pub fn mod_pow(mut base: u128, mut exp: u128, modulus: u128) -> u128 {
+    let mut result = 1u128;
+    base %= modulus; //First, we reduce the base with the modulo.
+    while exp > 0 { //Then, while the exponent is not equal to 0, we continue the exponentiation
+        if exp & 1 == 1 { //If the less significant bit is 1, we multiply
+            result = (result * base) % modulus;
+        }
+        base = (base * base) % modulus; //We prepare the base for the next iteration
+        exp >>= 1; //We pass to the next bit. (so that the next bit becomes the less significant bit for next step)
+    }
+    result //We return the result of the exponentiation
+}
+```
+This method avoids the overflow, and is fast, because we have at most $log₂(exp)$ iterations. 
+Since exp is a the most of the time an u64 in our code, $log₂(2^64) = 64$ iterations maximum.
+
+==== Finding $q$
+\
+We'll not implement a function for searching $q$, because it depends on the scheme we choose. For example, $q$ in BFV is totally different from $q$ in CKKS (in BFV, we'll not implement the RNS#footnote[https://en.wikipedia.org/wiki/Residue_number_system], but in CKKS we'll not have the choice). 
+\
+But, we can already implement an algorithm that returns a boolean, and that check if $q$ is compatible with the NTT or not.
+First, let's implement an algorithm that tests if a number is prime or not. 
+
+===== The `is_prime` algorithm
+\
+#codly(languages: codly-languages)
+```rust
+fn is_prime(n: u64) -> bool {
+    if n < 2 { return false; }      // 0, 1 aren't primes
+    if n == 2 { return true; }       // 2 is prime, and the only even prime 
+    if n.is_multiple_of(2) { return false; }  // Every other even number isn't prime
+    
+    // Test of the divisors from 3 to √n
+    let mut i = 3u64;
+    while i * i <= n {              // Condition : i ≤ √n
+        if n.is_multiple_of(i) {    // if i divide n
+            return false;           // n isn't a prime number
+        }
+        i += 2;                     // Next one
+    }
+    true  // If no divisor was found, n is prime
+}
+```
+\
+Why do we test to $sqrt(n)$ ? Because if n as a divisor $d > sqrt(n)$, $n/d < sqrt(n)$ is also a divisor.
+\
+Proof :
+\
+Let $d$ be a divisor of $n$ as $d > sqrt(n)$. We have $n = d * k$.
+\
+If $k > sqrt(n)$, $d * k > sqrt(n) * sqrt(n) = n$. But it isn't possible, since $d$ is a divisor of $n$.
+\
+So $k lt.eq n$, and so we just have to test the divisors from 3 to $sqrt(n)$.
+
+===== The `is_q_valid` algorithm
+\
+Now, we can implement the algorithm :
+\
+```rust
+pub fn is_q_valid(n: usize, q: u64) -> bool {
+    if n == 0 || q < 2 {  //If q < 2, or n = 0, then it can not be valid
+        return false;
+    }
+    
+    if !is_prime(q) { //if it is prime, it can not be valid
+        return false;
+    }
+    
+    let two_n = 2 * n as u64; //If the condition q - 1 mod 2n == 0 is true, then q is valid
+    (q - 1) % two_n == 0
+}
+```
+
+==== Finding $omega$
+\
+Now that we have $q$, `is_prime`, and $n$, we can find $omega$ as a primitive 2nth root of $n$ :
+\
+```rust
+pub fn find_valid_omega(n: usize, q: u64) -> u64 { 
+    let two_n = 2 * n;
+    let exp = (q - 1) / two_n as u64;
+    
+    for candidate in 2..q {
+        let omega = mod_pow(candidate as u128, exp as u128, q as u128) as u64;
+        
+        let omega_n = mod_pow(omega as u128, n as u128 , q as u128);
+        if omega_n == (q as u128 - 1)  {
+            return omega;
+        }
+    }
+    panic!("No valid omega found");
+}
+```
+\
+Why does $e = (q -1) slash 2n $ ? :
+\
+\
+The function needs to return an integer so that $omega$ is a primitive 2nth root of the unit in $ZZ_q$:
++ $omega^(2n) equiv 1 (mod q)$
++ $omega^n equiv -1 (mod q)$
++ $omega^k equiv.not 1 (mod q)$ for each $k < 2n$ 
+\
+We know that $q equiv 1 (mod 2n)$, so $e = (q-1) slash (2n)$ is an integer.
+\
+For each candidate $c in [2, q-1]$ :
+#align(center)[$omega = c^e mod q$]
+\
+Because of Fermat's little theorem#footnote[https://en.wikipedia.org/wiki/Fermat%27s_little_theorem], we have :
+#align(center)[$c^(q-1) equiv 1 (mod q)$]
+\
+So :
+#align(center)[$omega^(2n) = (c^e)^(2n)$]
+#align(center)[$omega^(2n) = c^(e * 2n)$]
+#align(center)[$omega^(2n) = c^(q-1)$]
+#align(center)[$omega^(2n) equiv 1 (mod q)$]
+\
+It works !
+\
+#pagebreak()
+\
+== `ntt.rs` : implementing the NTT, in Rust
+\
+Now, we can - finally - implement the NTT in Rust. First, we'll detail the _twiddle precalculation_.
+
+=== Twiddle precalculation
+\
+A _twiddle_ is a precomputed power of $omega$, as :
+\
+\
+#align(center)[$t_k = omega^k mod q$]
+\
+It's called twiddles because in FFT and NTT, the values are "twiddled" (I think it's the reason, but maybe I'm wrong).
+\
+\
+We have :
+\
+#align(center)[$r(x)$ = bit_reverse(x)]
+\
+#align(center)[$t[k] = omega^(r(k)) mod q$]
+\
+#align(center)[$overline(t)[k] = omega^(-r(k)) mod q$]
+\
+#align(center)[$psi = omega$]
+\
+#align(center)[$overline(psi) = omega^(-1) mod q$]
+\
+\
+Where not overlined means for forward NTT, and overlined means for inverse NTT.
+\
+We have a bit-reversed order because the "Merge in place" algorithm access to the twiddles in an order that correspond to bit_reversal of indices (We'll see it later). Instead of calculating bit_reverse(k) every time, we precompute it in bit-reversed order, so that the bit_reverse is done one time, and not $O(n log(n))$ times.
+
+So, to precompute the twiddles, we first create a structure called  :
+\
+```rust
+use crate::RingParams;
+use crate::modular::mod_pow;
+use crate::polys::Polynomial;
+
+#[derive(Clone)]
+pub struct NTTprecaculated {
+    twiddles: Box<[u128]>, //Storage for twiddles
+    twiddles_inv: Box<[u128]>, //Storage for inv_twiddles
+}
+```
+\
+Then, we implement the precalculation of the twiddles :
+\
+```rust
+pub fn precalculate(params: &RingParams) -> NTTprecaculated {
+    let n = params.n;
+    let q = params.q as u128;
+    let psi = params.omega as u128;  //Yes, it's just a name changing, but it's how it's written in the formula.
+    let log_n = n.trailing_zeros(); //Because n is a power of 2, the number of trailing zeros gives us log_2(n)
+   
+    let mut twiddles = vec![1u128; n];
+    for k in 0..n {
+        let br_k = k.reverse_bits() >> (64 - log_n); //Reverse bit of k on log_n bits
+        let power = br_k as u128;        
+        twiddles[k] = mod_pow(psi, power, q); //The twiddle is psi^bit_reversed(k)
+    }
+    
+  
+    let psi_inv = mod_pow(psi, q - 2, q); //because of fermat's little theorem
+    let mut twiddles_inv = vec![1u128; n];
+    for k in 0..n {
+        let br_k = k.reverse_bits() >> (64 - log_n);
+        let power = br_k as u128;
+        twiddles_inv[k] = mod_pow(psi_inv, power, q); 
+    }
+    
+    NTTprecaculated {
+        twiddles: twiddles.into_boxed_slice(), //We return the twiddles
+        twiddles_inv: twiddles_inv.into_boxed_slice(), //And the twiddle inv
+    }
+}
+```
+What are trailing zeros ? Trailing zeros are non-significants zeros in binary representation. For example, with $n = 4096$, we have :
+#align(center)[$n = 4096$]
+#align(center)[$n = 2^12$]
+#align(center)[$n = 1000000000000$]
+There are 12 trailing zeros, and $log_2(4096) = 12$.
+\
+\
+Why using $log_2(n)$ ? Because we do the bit_reverse on exactly $log_2(n)$ bits. For example, with $n = 8 :$
+#align(center)[$n = 2^3$]
+#align(center)[$log_2(2^3) = 3$]
+#align(center)[$k = 1 = 001 => r(k) = 100 = 4$]
+#align(center)[$k = 2 = 010 => r(k) = 010 = 2$]
+#align(center)[$k = 3 = 011 => r(k) = 110 = 6$]
+\
+#pagebreak()
+=== Forward NTT in single thread
+\
+The NTT used here is a modern one from this paper : #link("https://eprint.iacr.org/2022/1222.pdf")[Homomorphic encryption on GPU, 2022/1222]#footnote[Özcan, Ali & Ayduman, Can & Türkoğlu, Enes & Savaş, Erkay. (2023). Homomorphic Encryption on GPU. IEEE Access. PP. 1-1. 10.1109/ACCESS.2023.3265583.].  
+```rust
+fn forward_ntt_single(
+    params: &RingParams, //We'll use the defined parameters,
+    polynomial: &Polynomial, //The polynomial to convert in NTT domain,
+    ntt_tables: &NTTprecaculated //And the precalculated twiddles.
+) -> Polynomial {
+    let mut coeffs: Vec<u64> = polynomial.coeffs.to_vec();
+        
+    let n = params.n;
+    let q = params.q as u128; //Conversion for later
+    let mut t: usize = n; 
+    let mut m: usize = 1;
+
+    loop { 
+        t /= 2; //Distance between 2 butterflies 
+        for i in 0..m {  //For every group of butterflies
+            let j1 = 2 * i * t; 
+            let j2 = j1 + t - 1;
+
+            for j in j1..=j2 {
+                let u = coeffs[j] as u128; //The butterfly operation
+                let w = ntt_tables.twiddles[m + i]; //We use the precomputed twiddles
+                let v = ((coeffs[j + t]) as u128 * w) % q; //Reduction so that it remains in the ring
+                    
+                    let mut x = u + v; //High (a_i)
+                    if x >= q { x -= q; } //reduction
+                    coeffs[j] = x as u64; //We insert the coefficient
+
+                    let y = if u >= v { u - v } else { u + q - v }; //Low (a_(i+t)) then reduction
+                    coeffs[j + t] = y as u64; //We instert the coefficient
+
+            }
+        }
+
+        m *= 2; 
+
+        if m >= n { break; } //To stop the loop, when it's finished
+    }
+
+    Polynomial {
+        coeffs: coeffs.into_iter().collect::<Vec<_>>().into_boxed_slice(), //We return the coefficients, into a Polynomial.
+    }
+}
+```
+Explanation :
+\
+\
+The $t$ iteration is done so that we get the coefficients that are in pair :
+\
+  t=4:  [0]◄──4──►[4]  [1]◄──4──►[5]  [2]◄──4──►[6]  [3]◄──4──►[7]
+  \
+  \
+  t=2:  [0]◄─2─►[2]  [1]◄─2─►[3]  [4]◄─2─►[6]  [5]◄─2─►[7]
+  \
+  \
+  t=1:  [0]◄1►[1]  [2]◄1►[3]  [4]◄1►[5]  [6]◄1►[7] 
+
+\
+The $m$ iteration is done so that all butterflies that uses the same twiddle factor uses the twiddle factor of index $m$. We do $m = m*2$ because each time we divide the distance between two butterflies ($t$), we scale by 2 the number of groups.
+\
+\
+$j_1$ and $j_2$ are the bounds of the group :
+#align(center)[$j_1 = 2 * i *t$ -> index of the first bound]
+#align(center)[$j_2 = j_1 + t -1$ -> index of the second bound]
+\
+For example, with $n = 8$, at the second iteration ($t = 2, m = 2$) :
+#align(center)[groupe i=0 :]
+
+#pagebreak()
+=== Forward NTT in multi-thread
+\
+This NTT is also based on the research paper, but implements parallelism with rayon.
+
+```rust
+#[cfg(feature = "parallel")]
+fn forward_ntt_multi(
+    params: &RingParams, //Same, the use the parameters, the polynomial and the precalculated twiddles.
+    polynomial: &Polynomial,
+    ntt_tables: &NTTprecaculated
+) -> Polynomial {
+    let mut coeffs: Vec<u128> = polynomial.coeffs
+        .iter() //We iter, and collect, it's the same thing as in the forward code, but written differently and passing it into u128s
+        .map(|&c| c as u128)
+        .collect();
+
+    let n = params.n; 
+    let q = params.q as u128;
+
+    let mut t: usize = n; //The same
+    let mut m: usize = 1;
+
+    loop {
+        t = t / 2;
+
+       
+
+    coeffs
+    .par_chunks_mut(2 * t) //We do a par_iter_mut, which is an operation implemented by rayon which allows us to "cut" the vector into chunks of a size of 2t
+    .enumerate()
+    .for_each(|(i, chunk)| {  //We treat each chunk in parallel. It's the only thing that changes
+        for j in 0..t {
+            let u = chunk[j];
+            let w = ntt_tables.twiddles[m + i];
+            let v = ((chunk[j + t]) * w) % params.q as u128;
+            let sum = u + v;
+           
+            chunk[j] = if sum >= q { sum - q } else { sum }; 
+
+            chunk[j + t] = if u >= v { u - v } else { u + q - v };
+        }
+    });
+   
+
+        m = m * 2;
+
+        if m >= n { break; }
+    }
+
+    Polynomial {
+        coeffs: coeffs.into_iter().map(|c| c as u64).collect::<Vec<_>>().into_boxed_slice(), //Same thing as in the single-thread code, except the fact that we repass it into u64s
+    }
+}
 ```

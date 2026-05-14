@@ -4,9 +4,9 @@ use rand::{Rng, RngCore, rngs::OsRng};
 use std::ops::Deref;
 
 #[derive(Clone, Debug)]
-pub struct Noise(pub Vec<i32>);
+pub struct Sample(pub Vec<i32>);
 
-impl Deref for Noise {
+impl Deref for Sample {
     type Target = Vec<i32>;
 
     fn deref(&self) -> &Self::Target {
@@ -14,7 +14,7 @@ impl Deref for Noise {
     }
 }
 
-impl Noise {
+impl Sample {
     pub fn to_poly(self, q:u64) -> Polynomial {
         let coeffs = self.iter().map(|v| (*v).rem_euclid(q as i32) as u64).collect();
         Polynomial::new(coeffs)
@@ -24,7 +24,7 @@ impl Noise {
 
 
 #[inline]
-pub fn generate_cbd_noise(n: usize, eta: usize) -> Noise { //Inter function to create Centered Binomial Distribution
+pub fn generate_cbd_sample(n: usize, eta: usize) -> Sample { //Inter function to create Centered Binomial Distribution
 
     /*
     This is how it works (on the left, explanations and on the right, example) :
@@ -63,29 +63,28 @@ pub fn generate_cbd_noise(n: usize, eta: usize) -> Noise { //Inter function to c
             bit_index += 1;
         }
 
-        *coeff = a as i32 - b as i32; //And we finally do a - b mod q
+        *coeff = a as i32 - b as i32; //And we finally do a - b
     }
     
-    Noise(coeffs)
+    Sample(coeffs)
 }
 
 
 #[inline]
-pub fn generate_small_polynomial(params: &RingParams) -> Polynomial { //Intern function that generates the small-coeffs polynomials
+pub fn generate_small_sample(params: &RingParams) -> Sample { //Intern function that generates the small-coeffs sample
     let mut rng = OsRng; 
-    let mut coeffs = Vec::with_capacity(params.n);
+    let mut coeffs: Vec<i32> = Vec::with_capacity(params.n);
     
     for _ in 0..params.n {
-        let small: i8 = rng.gen_range(-1..=1); //We generate coeffs in the alphabet A = {-1, 0, 1}
-        let val = if small == -1 { params.q - 1 } else { small as u64 };
-        coeffs.push(val);
+        let small: i32 = rng.gen_range(-1..=1); //We generate coeffs in the alphabet A = {-1, 0, 1}
+        coeffs.push(small);
     }
     
-    Polynomial { coeffs: coeffs.into_boxed_slice() } //We finally create the polynomial
+    Sample(coeffs)
 }
 
 #[inline]
-pub fn generate_uniform_polynomial(params: &RingParams) -> Polynomial { //Intern function for generating a polynomial with uniform distribution
+pub fn generate_uniform_polynomial(params: &RingParams) -> Polynomial { //Intern function for generating a polynomial with uniform distribution, in the ring
     let mut rng = OsRng;
     let mut coeffs = Vec::with_capacity(params.n);
 

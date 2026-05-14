@@ -38,12 +38,12 @@ impl Polynomial {
     }
 
     #[cfg(feature = "parallel")]
-    pub fn sum(&self, params: &BFVparams, polynomial: &Polynomial) -> Polynomial {
+    pub fn sum(&self, params: &RingParams, polynomial: &Polynomial) -> Polynomial {
         Self::polynomial_sum_multi( params,  self, polynomial)
     }
 
     #[cfg(feature = "parallel")]
-    pub fn sub(&self, params: &BFVparams, polynomial: &Polynomial) -> Polynomial {
+    pub fn sub(&self, params: &RingParams, polynomial: &Polynomial) -> Polynomial {
         Self::polynomial_sub_multi( params,  self, polynomial)
     }
 
