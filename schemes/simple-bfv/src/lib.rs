@@ -2,9 +2,11 @@
 mod scheme;
 mod config;
 mod plaintext;
+mod find_parameters;
 
 pub use crate::config::BFV as BFV;
 pub use crate::plaintext::BFVPlaintext;
+pub use crate::find_parameters::find_valid_q as find_valid_q;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;

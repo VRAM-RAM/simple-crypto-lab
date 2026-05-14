@@ -1,5 +1,5 @@
 use crate::{BFV, plaintext::BFVPlaintext};
-use simple_ring::{Polynomial, generate_cbd_noise, generate_small_polynomial, generate_uniform_polynomial};
+use simple_ring::{Polynomial, generate_cbd_sample, generate_uniform_polynomial, generate_small_sample};
 
 #[derive(Debug, Clone)]
 pub struct BFVCiphertext {
@@ -13,8 +13,9 @@ impl BFV {
         let params = &self.params;
         let ntt_tables = &self.ntt_precalculated;
         let a = generate_uniform_polynomial(params);
-        let s = generate_small_polynomial(params);
-        let e = generate_cbd_noise(params.n, self.eta);
+        let s = generate_small_sample(params);
+        let s = s.to_poly(params.q);
+        let e = generate_cbd_sample(params.n, self.eta);
         let e = e.to_poly(params.q);
         let mul = a.mul_ntt(params, ntt_tables, &s);
         let b = mul.sum(params, &e);
@@ -27,12 +28,13 @@ impl BFV {
         let ntt_tables = &self.ntt_precalculated;
         let (a, b) = public_key;
         
-        let u = generate_small_polynomial(params);
+        let u = generate_small_sample(params);
+        let u = u.to_poly(params.q);
 
-        let e1 = generate_cbd_noise(params.n, self.eta);
+        let e1 = generate_cbd_sample(params.n, self.eta);
         let e1 = e1.to_poly(params.q);
 
-        let e2 = generate_cbd_noise(params.n, self.eta);
+        let e2 = generate_cbd_sample(params.n, self.eta);
         let e2 = e2.to_poly(params.q);
         
         let delta = params.q / self.t;
