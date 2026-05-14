@@ -850,7 +850,7 @@ In that case, $omega$ exists.
 
 \
 == The NTT Transform
-=== The formal definition
+=== The formal definition of the forward NTT
 
 This is the formal definition of the NTT :
 \
@@ -884,6 +884,18 @@ And then returns $[â_0, â_1,..., â_(n-1)]$.
 The result is here $â = [6, 6, 2, 7]$, we've transform our polynomial into the NTT domain !
 \
 But, there is a problem : the computation cost. As you've seen, we have done, for every $a$, 4 sums and 4 products. So, the complexity is $O(2n^2)$.
+\
+\
+=== The formal definition of the inverse NTT
+\
+We've seen the formal definition of the forward NTT. But, to get back into the "normal" coefficients domain, we need an operation called the inverse NTT.
+\
+It's formal definition is :
+\
+\
+#align(center)[$a_j = n^(-1) hyph.point sum_(j=0)^(n-1) a_j hyph.point omega^(-i hyph.point j) mod q$]
+\
+So, basically, the difference is in the $-i$ (we compute the inverse of $omega^(i hyph.point j)$) and the factor $n^(-1)$.
 \
 \
 === The trick to reduce complexity : the butterfly operation 
@@ -1261,8 +1273,77 @@ $j_1$ and $j_2$ are the bounds of the group :
 #align(center)[$j_1 = 2 * i *t$ -> index of the first bound]
 #align(center)[$j_2 = j_1 + t -1$ -> index of the second bound]
 \
+\
+And $j$ is the index of $u$ in each butterfly.
+\
+\
 For example, with $n = 8$, at the second iteration ($t = 2, m = 2$) :
-#align(center)[groupe i=0 :]
+\
+\
+Group $i = 0$ :
+\
+#align(center)[$j_1 = 2 * 0 * 2 = 0$]
+#align(center)[$j_2 = 0 + 2 - 1 = 1$]
+\
+#align(center)[Butterflies on coeffs[j]↔coeffs[j + t] and coeffs[j]↔coeffs[j + t].]
+#align(center)[Butterflies on coeffs[0]↔coeffs[2] and coeffs[1]↔coeffs[3].]
+\
+Group $i = 1$ :
+#align(center)[$j_1 = 2 * 1 * 2 = 4$]
+#align(center)[$j_2 = 4 + 2 - 1 = 5$]
+\
+#align(center)[Butterflies on coeffs[j]↔coeffs[j + t] and coeffs[j]↔coeffs[j + t].]
+
+#align(center)[Butterflies on coeffs[4]↔coeffs[6] and coeffs[5]↔coeffs[7].]
+#align(center)[ . . .]
+\
+\
+We can visualize like this, for example :
+\
+\
+Initial state : coeffs = $[a_0, a_1, a_2, a_3, a_4, a_5, a_6, a_7]$.
+\
+\
+\
+Iteration 1 : $t=4$, $m=1$ :
+\                       
+\           
+Group $i=0$ : $j_1=0$,  $j_2=3$                                
+#align(center)[j=0 : coeffs[0] ↔ coeffs[4]  (twiddle = twiddles[1])]
+#align(center)[j=1 : coeffs[1] ↔ coeffs[5]  (twiddle = twiddles[1])]
+#align(center)[j=2 : coeffs[2] ↔ coeffs[6]  (twiddle = twiddles[1])]
+#align(center)[j=3 : coeffs[3] ↔ coeffs[7]  (twiddle = twiddles[1])]
+\                                     
+4 butterflies, same twiddle, distance of 4.                
+\
+\
+\
+Iteration 2 : $t=2$, $m=2$ : 
+\
+\                                 
+Group $i=0$ : $j_1=0$ , $j_2=1$ :                                
+#align(center)[j=0 : coeffs[0] ↔ coeffs[2]  (twiddle = twiddles[2])]
+#align(center)[j=1 : coeffs[1] ↔ coeffs[3]  (twiddle = twiddles[2])]
+\
+\                                                    
+Group $i=1$ : $j_1=4$, $j_2=5$                                
+#align(center)[j=4 : coeffs[4] ↔ coeffs[6]  (twiddle = twiddles[3])]
+#align(center)[j=5 : coeffs[5] ↔ coeffs[7]  (twiddle = twiddles[3])]
+\
+2 groups of 2 butterflies, distance of 2            
+\
+\
+\
+
+Iteration 3 : $t=1$, $m=4$                                  
+#align(center)[Group $i=0$ : $j_1=0, j_2=0$ → $j=0$ : coeffs[0] ↔ coeffs[1] (twiddles[4])]
+#align(center)[Group $i=1$ : $j_1=2, j_2=2$ → $j=2$ : coeffs[2] ↔ coeffs[3] (twiddles[5])]
+#align(center)[Group $i=2$ : $j_1=4, j_2=4$ → $j=4$ : coeffs[4] ↔ coeffs[5] (twiddles[6])]
+#align(center)[Group $i=3$ : $j_1=6, j_2=6$ → $j=6$ : coeffs[6] ↔ coeffs[7] (twiddles[7])]
+\
+4 groups of 1 butterfly, distance of 1                  
+
+Result : coeffs = $[â_0, â_4, â_2, â_6, â_1, â_5, â_3, â_7]$ (order bit-reversed)
 
 #pagebreak()
 === Forward NTT in multi-thread
@@ -1289,8 +1370,6 @@ fn forward_ntt_multi(
 
     loop {
         t = t / 2;
-
-       
 
     coeffs
     .par_chunks_mut(2 * t) //We do a par_iter_mut, which is an operation implemented by rayon which allows us to "cut" the vector into chunks of a size of 2t
