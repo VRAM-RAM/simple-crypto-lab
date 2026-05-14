@@ -1,5 +1,10 @@
 # simple-crypto-lab
+\
 ![simple-cryp-lab](https://img.shields.io/badge/simple_crypto_lab-rust-orange)
+![CI](https://github.com/user/repo/actions/workflows/ci.yml/badge.svg)
+![Coverage](https://img.shields.io/codecov/c/github/user/repo)
+![Version](https://img.shields.io/github/v/release/user/repo)
+![License](https://img.shields.io/github/license/user/repo)
 \
 This workspace contains educational implementations of cryptographic schemes based on 
 ring learning with errors (RLWE). The code is designed for **learning and experimentation**, 
