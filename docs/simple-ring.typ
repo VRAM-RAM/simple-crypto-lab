@@ -252,7 +252,7 @@ impl Polynomial {
 ```
 \
 
-=== Polynomial multiplication
+=== Polynomial multiplication <poly_mul>
 \
 Now, let's introduce a more "complex" function : the polynomial multiplication in $ZZ_q$.
 The naive multiplication (not in the  ring) in noted as :
@@ -893,11 +893,108 @@ We've seen the formal definition of the forward NTT. But, to get back into the "
 It's formal definition is :
 \
 \
-#align(center)[$a_j = n^(-1) hyph.point sum_(j=0)^(n-1) a_j hyph.point omega^(-i hyph.point j) mod q$]
+#align(center)[$a_j = n^(-1) hyph.point sum_(j=0)^(n-1) â_j hyph.point omega^(-i hyph.point j) mod q$]
 \
 So, basically, the difference is in the $-i$ (we compute the inverse of $omega^(i hyph.point j)$) and the factor $n^(-1)$.
 \
 \
+For example, with the computed coefficients $â = [6, 6, 2, 7]$, we have :
+\
+\
+#align(center)[$a_0 = n^(-1) hyph.point (â_0 hyph.point omega^0 + â_1 hyph.point omega^0 + â_2 hyph.point omega^0 + â_3 hyph.point omega^0 ) mod 17$]
+#align(center)[$a_0 = n^(-1) hyph.point (6 hyph.point 1 + 6 hyph.point 1 + 2 hyph.point 1 + 7 hyph.point 1) mod 17$]
+#align(center)[$a_0 = 1/4 hyph.point 21 mod 17$]
+#align(center)[$a_0 = 1$]
+
+\
+\
+#align(center)[$a_1 = n^(-1) hyph.point (â_0 hyph.point omega^0 + â_1 hyph.point omega^(-1) + â_2 hyph.point omega^(-2) + â_3 hyph.point omega^(-3) ) mod 17$]
+#align(center)[$a_1 = 2$]
+\
+\
+#align(center)[$a_2 = n^(-1) hyph.point (â_0 hyph.point omega^0 + â_1 hyph.point omega^(-2) + â_2 hyph.point omega^(-4) + â_3 hyph.point omega^(-6) ) mod 17$]
+#align(center)[$a_2 = 3$]
+\
+\
+#align(center)[$a_3 = n^(-1) hyph.point (â_0 hyph.point omega^0 + â_1 hyph.point omega^(-3) + â_2 hyph.point omega^(-6) + â_3 hyph.point omega^(-9) ) mod 17$]
+#align(center)[$a_3 = 0$]
+\
+Done ! We have our original coefficients : $a = [1, 2, 3, 0]$.
+\
+\
+=== Proof that INTT(NTT(a)) = a 
+\
+Now, we want to proove that INTT(NTT(a)) = a. 
+\
+We have :
+\
+\
+#align(center)[$r_i = n^(-1) hyph.point sum_(k=0)^(n-1) â_k hyph.point omega^(-i hyph.point k) mod q$]
+\
+#align(center)[$r_i = n^(-1) hyph.point sum_(k=0)^(n-1) (sum_(j=0)^(n-1) a_j hyph.point omega^(k hyph.point j) mod q) hyph.point omega^(-i hyph.point k) mod q$]
+\
+#align(center)[$r_i = n^(-1) hyph.point sum_(k=0)^(n-1) hyph.point sum_(j=0)^(n-1) a_j hyph.point omega^(k hyph.point j) hyph.point omega^(-i hyph.point k) mod q$]
+\
+#align(center)[$r_i = n^(-1) hyph.point sum_(k=0)^(n-1) hyph.point sum_(j=0)^(n-1) a_j hyph.point omega^((k hyph.point j) - (i hyph.point k)) mod q$]
+\
+#align(center)[$r_i = 1/n hyph.point sum_(k=0)^(n-1) hyph.point sum_(j=0)^(n-1) a_j hyph.point omega^(k hyph.point (j - i)) mod q$]
+\
+In that case, if $j = i$, we have $omega^((j-i) hyph.point k) = omega^0 = 1$, so every term of the sum is equal to $1$, so that the result of the sum is $n$.
+\
+
+If $j eq.not i$, we have :
+\
+\
+#align(center)[$sum_(k=0)^(n-1) omega^((j-i) hyph.point k) = 1 + omega^((j-i)) + omega^((j-i) hyph.point 2) + ... + omega^((j-i) hyph.point (n-1))$]
+\
+#align(center)[$sum_(k=0)^(n-1) omega^((j-i) hyph.point k) = (1 - omega^((j-i) hyph.point n))/(1 - omega^(j-i))$]
+\
+#align(center)[$sum_(k=0)^(n-1) omega^((j-i) hyph.point k) = (1 - omega^((n) hyph.point (j-i)))/(1 - omega^(j-i))$]
+\
+But, $omega^n = 1$, so that :
+\
+#align(center)[$sum_(k=0)^(n-1) omega^((j-i) hyph.point k) = (1 - 1^(j-i))/(1 - omega^(j-i))$]
+\
+#align(center)[$sum_(k=0)^(n-1) omega^((j-i) hyph.point k) = 0$ if $i eq.not j$]
+\
+\
+When we apply it to the formula, we have :
+\
+\
+#align(center)[$r_i = 1/n hyph.point sum_(k=0)^(n-1) hyph.point sum_(j=0)^(n-1) a_j hyph.point omega^(k hyph.point (j - i)) mod q$]
+\
+#align(center)[$r_i = 1/n (a_0 hyph.point 0 + a_1 hyph.point 0 + ... + a_i hyph.point n + ... + a_(n-1) hyph.point 0) mod  q$]
+\
+#align(center)[$r_i = 1/n hyph.point a_i hyph.point n mod  q$]
+\
+#align(center)[$r_i = a_i mod  q$]
+\
+We have recovered our coefficient !
+
+\
+=== Proof that INTT(NTT(a) x NTT(b)) = a x b
+\
+What we want is to multiply the polynomial in the NTT domain, coefficient by coefficient. So, we want 
+\
+We've said before that the formula of the polynomial multiplication was :
+\
+\
+#align(center)[$c_k = sum_(i=0)^(n-1) sum_(j=0)^(n-1) a_i b_j $ where $ i+j equiv k (mod 2n)$]
+\
+With the constraint $X^n = -1$ :
+\
+#align(center)[$r_k = c_k - c_(k+n) mod q$]
+\
+And $r$ is the result of the multiplication.
+\
+For explanations and more details, please see the polynomial mul section#footnote[ #link(<poly_mul>)[poly mul section]].
+\
+\
+Let $r = $ INTT($ĉ$). We have :
+\
+\
+#align(center)[$r_m = n^(-1) sum_(k=0)^(n-1) ĉ_k omega^(-m k)$]
+
 === The trick to reduce complexity : the butterfly operation 
 \
 As we've seen, the formal definition of the NTT is :
@@ -932,7 +1029,7 @@ Then, knowing that $omega^(i+n slash 2) = -omega^i$, we have :
 #align(center)[$â_i = $ Evenpart(i) + $omega^i *$ Oddpart(i)]
 #align(center)[$â_(i+n slash 2) = $ Evenpart(i) - $omega^i *$ Oddpart(i)]
 \
-And so, for two coefficients, we only have to compute the same Evenpart, the same Oddpart. We reduce the complexity by two. By computing $omega^i * $ Oddpart(i) only one time for the two coefficients, we reduce it again, and, by accessing only one index of coefficients $(i)$ for the results of index $i$ and $i + n slash 2$, we reduce the meory cost !
+And so, for two coefficients, we only have to compute the same Evenpart, the same Oddpart. We reduce the complexity by two. By computing $omega^i * $ Oddpart(i) only one time for the two coefficients, we reduce it again, and, by accessing only one index of coefficients $(i)$ for the results of index $i$ and $i + n slash 2$, we reduce the memory cost !
 \
 Why $O( n log n)$ ? Because the butterfly is applied $log_2(n)$ times : 
 #table(
