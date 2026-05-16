@@ -1,5 +1,5 @@
 use crate::{BFV, plaintext::BFVPlaintext};
-use simple_ring::{Polynomial, generate_cbd_sample, generate_uniform_polynomial, generate_small_sample};
+use simple_ring::{Polynomial, generate_cbd_sample, generate_uniform_polynomial, generate_small_sample, RingParams};
 
 #[derive(Debug, Clone)]
 pub struct BFVCiphertext {
@@ -9,7 +9,7 @@ pub struct BFVCiphertext {
 
 
 impl BFV {
-    pub fn generate_keys(&self) -> (Polynomial, Polynomial, Polynomial) { //The key generation. For informations about math formula, please see : 
+    pub fn generate_keys(&self) -> (Polynomial, Polynomial, Polynomial) { //The key generation. For informations about math formula, please see /docs/simple-bfv
         let params = &self.params;
         let ntt_tables = &self.ntt_precalculated;
         let a = generate_uniform_polynomial(params);
@@ -23,7 +23,7 @@ impl BFV {
         (a, b, s)
     }
 
-    pub fn encrypt(&self, message: &BFVPlaintext, public_key: (&Polynomial, &Polynomial)) -> BFVCiphertext { //The encryption. Same, you'll find the explanation here :
+    pub fn encrypt(&self, message: &BFVPlaintext, public_key: (&Polynomial, &Polynomial)) -> BFVCiphertext { //The encryption. Same, you'll find the explanation in /docs/simple-bfv
         let params = &self.params;
         let ntt_tables = &self.ntt_precalculated;
         let (a, b) = public_key;
@@ -50,7 +50,7 @@ impl BFV {
         BFVCiphertext { c0, c1 }
     }
 
-    pub fn backend_decrypt(&self, ciphertext: &BFVCiphertext, secret_key: &Polynomial) -> Polynomial { //The backend decryption. Same, you'll find the explanation here :
+    pub fn backend_decrypt(&self, ciphertext: &BFVCiphertext, secret_key: &Polynomial) -> Polynomial { //The backend decryption. Same, you'll find the explanation at /docs/simple-bfv
         let params = &self.params;
         let ntt_tables = &self.ntt_precalculated;
         let c1s = ciphertext.c1.mul_ntt(params, ntt_tables, secret_key);
@@ -74,7 +74,7 @@ impl BFV {
             Polynomial::new(coeffs)
     }
 
-    pub fn decrypt(&self, ciphertext: &BFVCiphertext, secret_key: &Polynomial) -> String { //The decryption. Same, you'll find the explanation here :
+    pub fn decrypt(&self, ciphertext: &BFVCiphertext, secret_key: &Polynomial) -> String { //The decryption. Same, you'll find the explanation at /docs/simple-bfv
         let params = &self.params;
         let ntt_tables = &self.ntt_precalculated;
         let c1s = ciphertext.c1.mul_ntt(params, ntt_tables, secret_key);
@@ -127,6 +127,24 @@ impl BFV {
         BFVCiphertext { c0: new_c0, c1: new_c1 }
     }
 
+    pub fn estimate_noise(&self, secret_key: &Polynomial, params: &RingParams, ciphertext: &BFVCiphertext) -> u64 {
+        let c1s = ciphertext.c1.mul_ntt(params, &self.ntt_precalculated, secret_key);
+        let m_prime = ciphertext.c0.sub(params, &c1s);
+        
+        // Compute max absolute coefficient after centering
+        let mut max_noise = 0u64;
+        let q = params.q as i128;
+        for &coeff in m_prime.coeffs.iter() {
+            let centered = if coeff as i128 > q / 2 { 
+                coeff as i128 - q 
+            } else { 
+                coeff as i128 
+            };
+            let noise = centered.abs() as u64;
+            if noise > max_noise { max_noise = noise; }
+        }
+        max_noise
+    }
 }
 
 
