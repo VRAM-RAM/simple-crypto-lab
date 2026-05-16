@@ -9,17 +9,19 @@ pub use ring::RingParams as RingParams;
 pub use polys::Polynomial as Polynomial;
 pub use modular::{find_valid_omega, is_q_valid, mod_pow, is_prime};
 pub use sampling::{generate_small_sample, generate_cbd_sample, generate_uniform_polynomial};
-
+pub use ntt::{forward_ntt, inverse_ntt, precalculate};
 #[cfg(test)]
 #[test]
 fn test_polynomials() {
     let params = RingParams::new(4, 17, find_valid_omega(4, 17)); //We define the parameters
+    let ntt_tables = &precalculate(&params);
     let mut coeffs = vec![0u64; 4]; //We create the coefficients for our first polynomial
     coeffs[3] = 8;
     let poly1 = Polynomial::new(coeffs.clone()); //We create the first polynomial as P1 = [0, 0, 0, 8]
     let poly2 = Polynomial::zeros(4); //We create an empty polynomial, which will be the second one.
     let sum = poly1.sum(&params, &poly2); //We execute the defined methods 
     let mul = poly1.mul(&params, &poly2);
+    let mul_ntt = poly1.mul_ntt(&params, ntt_tables, &poly2); 
     let scaled = poly1.scale(&params, 10);
     let divided = poly1.divide_by_constant(2);
     let reduced = poly1.reduce(2);
@@ -35,6 +37,9 @@ fn test_polynomials() {
     assert_eq!(poly1.coeffs, sum.coeffs);
     println!();
     println!("Product is : {:?}", mul);
+    assert_eq!(poly2.coeffs, mul.coeffs);
+    println!();
+    println!("Product with NTT is : {:?}", mul_ntt);
     assert_eq!(poly2.coeffs, mul.coeffs);
     println!();
     println!("Scaled first polynomial is : {:?}", scaled);

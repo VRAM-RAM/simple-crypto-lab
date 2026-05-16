@@ -390,7 +390,7 @@ impl Polynomial {
 First, in [1], we do the naive multiplication, and then, in [2], we apply the formula $c_k = (b_k - b_(k+n)) mod q$ (low is $b_k$ and high is $b_(k+n)$). We use .rem_euclid so that it remains euclidean (and we cannot have negative values).
 \
 \
-It's done ! The polynomial multiplication is implemented. But we'll see later that this implementation, being too slow (complexity $O(n^2)$), will be replaced.
+It's done ! The polynomial multiplication is implemented. But we'll see later that this implementation, being too slow (complexity $O(n^2)$), will be replaced#footnote[We'll see #link(<poly_mul_ntt>)[the multiplication in ntt domain], but it is recommended to first see the #link(<ntt>)[ntt section] before.].
 \
 === Polynomial scaling
 \
@@ -764,7 +764,7 @@ pub fn generate_uniform_polynomial(params: &RingParams) -> Polynomial {
 We have now finished with the sampling. Now, we will approach the most difficult concept of this implementation : the NTT.
 
 #pagebreak()
-= Deeping into NTT 
+= Deeping into NTT <ntt> 
 \
 The Number Theoretic Transform is the equivalent of the FFT, but in modular arithmetic : while the FFT is computed on complex numbers and roots of unit as $omega^n = 1$, the NTT works on a finite field (the ring), with integers modulo $q$ and a primitive root modulo $q$.
 
@@ -922,59 +922,83 @@ For example, with the computed coefficients $â = [6, 6, 2, 7]$, we have :
 Done ! We have our original coefficients : $a = [1, 2, 3, 0]$.
 \
 \
-=== Proof that INTT(NTT(a)) = a 
+=== Proof that INTT(NTT(a)) = a
 \
-Now, we want to proove that INTT(NTT(a)) = a. 
+Now, we want to prove that INTT(NTT(a)) = a in the negacyclic case.
 \
-We have :
+We work with $omega in ZZ_q$, a primitive *2n-th* root of unity (as seen before):
 \
 \
-#align(center)[$r_i = n^(-1) hyph.point sum_(k=0)^(n-1) â_k hyph.point omega^(-i hyph.point k) mod q$]
+#align(center)[$omega^(2n) equiv 1 (mod q) quad $and$ quad omega^n equiv -1 (mod q)$]
 \
-#align(center)[$r_i = n^(-1) hyph.point sum_(k=0)^(n-1) (sum_(j=0)^(n-1) a_j hyph.point omega^(k hyph.point j) mod q) hyph.point omega^(-i hyph.point k) mod q$]
+#strong[Step 1: Definitions]
+\
+\
+NTT:
+\
+#align(center)[$hat(a)_k = sum_(j=0)^(n-1) a_j hyph.point omega^(k hyph.point j) mod q$]
+\
+INTT :
+\
+\
+#align(center)[$r_i = n^(-1) hyph.point sum_(k=0)^(n-1) hat(a)_k hyph.point omega^(-i hyph.point k) mod q$]
+\
+#strong[Step 2: Substitution]
+\
+Substitute $hat(a)_k$ into the INTT formula:
+\
+\
+#align(center)[$r_i = n^(-1) hyph.point sum_(k=0)^(n-1) (sum_(j=0)^(n-1) a_j hyph.point omega^(k hyph.point j)) hyph.point omega^(-i hyph.point k) mod q$]
 \
 #align(center)[$r_i = n^(-1) hyph.point sum_(k=0)^(n-1) hyph.point sum_(j=0)^(n-1) a_j hyph.point omega^(k hyph.point j) hyph.point omega^(-i hyph.point k) mod q$]
 \
-#align(center)[$r_i = n^(-1) hyph.point sum_(k=0)^(n-1) hyph.point sum_(j=0)^(n-1) a_j hyph.point omega^((k hyph.point j) - (i hyph.point k)) mod q$]
+#align(center)[$r_i = n^(-1) hyph.point sum_(k=0)^(n-1) hyph.point sum_(j=0)^(n-1) a_j hyph.point omega^(k hyph.point (j - i)) mod q$]
 \
-#align(center)[$r_i = 1/n hyph.point sum_(k=0)^(n-1) hyph.point sum_(j=0)^(n-1) a_j hyph.point omega^(k hyph.point (j - i)) mod q$]
+#strong[Step 3: Orthogonality Lemma]
 \
-In that case, if $j = i$, we have $omega^((j-i) hyph.point k) = omega^0 = 1$, so every term of the sum is equal to $1$, so that the result of the sum is $n$.
+Let $m = j - i$. We analyze the inner sum:
 \
+\
+#align(center)[$S(m) = sum_(k=0)^(n-1) omega^(k hyph.point m)$]
+\
+#table(
+  columns: 2,
+  [*Case*], [*Value of S(m)*],
+  [$j = i$ (so $m = 0$)], [$omega^0 = 1$, so $S(0) = sum_(k=0)^(n-1) 1 = n$],
+  [$j eq.not i$ (so $m eq.not 0$)], [Geometric serie, see below],
+)
+\
+If $j eq.not i$, we have a geometric serie :
+#align(center)[$S(m) = 1 + omega^m + omega^(2m) + ... + omega^((n-1)m)$]
+#align(center)[$S(m) = (1 - omega^(n hyph.point m)) / (1 - omega^m)$]
 
-If $j eq.not i$, we have :
+Now, since $omega^(2n) equiv 1 (mod q)$:
 \
 \
-#align(center)[$sum_(k=0)^(n-1) omega^((j-i) hyph.point k) = 1 + omega^((j-i)) + omega^((j-i) hyph.point 2) + ... + omega^((j-i) hyph.point (n-1))$]
-\
-#align(center)[$sum_(k=0)^(n-1) omega^((j-i) hyph.point k) = (1 - omega^((j-i) hyph.point n))/(1 - omega^(j-i))$]
-\
-#align(center)[$sum_(k=0)^(n-1) omega^((j-i) hyph.point k) = (1 - omega^((n) hyph.point (j-i)))/(1 - omega^(j-i))$]
-\
-But, $omega^n = 1$, so that :
-\
-#align(center)[$sum_(k=0)^(n-1) omega^((j-i) hyph.point k) = (1 - 1^(j-i))/(1 - omega^(j-i))$]
-\
-#align(center)[$sum_(k=0)^(n-1) omega^((j-i) hyph.point k) = 0$ if $i eq.not j$]
+#align(center)[$omega^(n hyph.point m) = (omega^n)^m equiv (-1)^m (mod q)$]
 \
 \
-When we apply it to the formula, we have :
-\
-\
-#align(center)[$r_i = 1/n hyph.point sum_(k=0)^(n-1) hyph.point sum_(j=0)^(n-1) a_j hyph.point omega^(k hyph.point (j - i)) mod q$]
-\
-#align(center)[$r_i = 1/n (a_0 hyph.point 0 + a_1 hyph.point 0 + ... + a_i hyph.point n + ... + a_(n-1) hyph.point 0) mod  q$]
-\
-#align(center)[$r_i = 1/n hyph.point a_i hyph.point n mod  q$]
-\
-#align(center)[$r_i = a_i mod  q$]
-\
-We have recovered our coefficient !
+For $m$ even: $omega^(n m) equiv 1$, so numerator $= 1 - 1 = 0$.
+  
+For $m$ odd: $omega^(n m) equiv -1$, but the sum still equals 0 
+(alternating series $1 - 1 + 1 - 1 + ... = 0$ for even $n$).
+In both cases: $S(m) = 0$ when $j eq.not i$. 
 
+#strong[Step 4: Apply Orthogonality]
+
+Only the term where $j = i$ contributes:
+#align(center)[$r_i = n^(-1) hyph.point (a_0 hyph.point 0 + a_1 hyph.point 0 + ... + a_i hyph.point n + ... + a_(n-1) hyph.point 0) mod q$]
+
+#align(center)[$r_i = n^(-1) hyph.point a_i hyph.point n mod q$]
+
+#align(center)[$r_i = a_i mod q$]
 \
-=== Proof that INTT(NTT(a) x NTT(b)) = a x b
+#strong[Conclusion:] We have recovered our coefficient ! 
 \
-What we want is to multiply the polynomial in the NTT domain, coefficient by coefficient. So, we want 
+\
+=== Proof that INTT(NTT(a) $*$ NTT(b)) = a $*$ b
+\
+What we want is to multiply the polynomials in the NTT domain, coefficient by coefficient.
 \
 We've said before that the formula of the polynomial multiplication was :
 \
@@ -985,16 +1009,66 @@ With the constraint $X^n = -1$ :
 \
 #align(center)[$r_k = c_k - c_(k+n) mod q$]
 \
-And $r$ is the result of the multiplication.
+Where $r$ is the final result of the multiplication.
 \
 For explanations and more details, please see the polynomial mul section#footnote[ #link(<poly_mul>)[poly mul section]].
+\
+\
+We've also seen the formula of the forward NTT and the inverse NTT. So, let the proof begin :
+\
+\
+Let :
+\
+- $â = $ NTT($a$), $hat(b) =$ NTT($b$)
+- $hat(c) = â dot.o hat(b) $
+\
+We want to prove that INTT($hat(c)) = a hyph.point b$
 \
 \
 Let $r = $ INTT($ĉ$). We have :
 \
 \
-#align(center)[$r_m = n^(-1) sum_(k=0)^(n-1) ĉ_k omega^(-m k)$]
-
+#align(center)[$r_m = n^(-1) hyph.point sum_(k=0)^(n-1) ĉ_k hyph.point omega^(-m hyph.point  k)$]
+\
+But $ĉ_k = â_k dot.o hat(b)$, so :
+\
+#align(center)[$r_m = n^(-1) hyph.point sum_(k=0)^(n-1) (â_k hyph.point hat(b)_k) hyph.point omega^(-m hyph.point k)$]
+\
+We substitute $â$ and $hat(b)$ by their NTT definitions :
+\
+\
+#align(center)[$r_m = n^(-1) hyph.point sum_(k=0)^(n-1) hyph.point (sum_(i=0)^(n-1) a_i hyph.point omega^(k hyph.point i)) hyph.point (sum_(j=0)^(n-1) b_j hyph.point omega^(k hyph.point j)) hyph.point omega^(-m hyph.point k)$]
+\
+We can now rearrange the sums :
+\
+\
+#align(center)[$r_m = n^(-1) hyph.point sum_(k=0)^(n-1) hyph.point sum_(i=0)^(n-1) hyph.point sum_(j=0)^(n-1) hyph.point a_i hyph.point b_j hyph.point omega^(k hyph.point i) hyph.point omega^(k hyph.point j) hyph.point omega^(-m hyph.point k)$]
+\
+#align(center)[$r_m = n^(-1) hyph.point sum_(i=0)^(n-1) hyph.point sum_(j=0)^(n-1) hyph.point a_i hyph.point b_j hyph.point sum_(k=0)^(n-1) hyph.point omega^(k (i + j - m))$]
+\
+We have, as seen before :
+#table(
+  columns: 2,
+  [*Possibility*], [*Value of the sum*],
+  [$i + j - m equiv 0 (mod n)$], [$S = n$],
+  [$i + j - m equiv.not 0 (mod n)$], [$S = 0$],
+)
+\
+So the only term where $i + j equiv m (mod n)$ contributes. In conclusion, we have :
+\
+#align(center)[$r_m = n^(-1) hyph.point sum_(i=0)^(n-1) hyph.point sum_(j=0)^(n-1) hyph.point a_i hyph.point b_j times n times delta_(i+j equiv m)$]
+\
+#align(center)[$r_m = sum_(i=0)^(n-1) sum_(j=0)^(n-1) a_i b_j $ where $ i+j equiv m (mod n)$]
+\
+And then because $omega^n = -1$, all terms of degree $>= n$ are automatically reduced. So, the computation of the INTT rebuild exactly the coefficients $r_k$ of $a_k * b_k$ in $ZZ_q$ :
+\
+\
+#align(center)[$r_k = sum_(i+j ≡ k (mod n)) ^ (n-1) a_i hyph.point b_j  $  knowing that $omega^n = -1$]
+\
+#align(center)[$= sum_(i+j = k) ^  (n-1) a_i hyph.point b_j  -  sum_(i+j = k+n) a_i hyph.point b_j  mod q$]
+\
+#align(center)[$= c_k$]
+\
 === The trick to reduce complexity : the butterfly operation 
 \
 As we've seen, the formal definition of the NTT is :
@@ -1469,7 +1543,7 @@ fn forward_ntt_multi(
         t = t / 2;
 
     coeffs
-    .par_chunks_mut(2 * t) //We do a par_iter_mut, which is an operation implemented by rayon which allows us to "cut" the vector into chunks of a size of 2t
+    .par_chunks_mut(2 * t) //We do a par_chunk_mut, which is an operation implemented by rayon which allows us to "cut" the vector into chunks of a size of 2t
     .enumerate()
     .for_each(|(i, chunk)| {  //We treat each chunk in parallel. It's the only thing that changes
         for j in 0..t {
@@ -1493,5 +1567,274 @@ fn forward_ntt_multi(
     Polynomial {
         coeffs: coeffs.into_iter().map(|c| c as u64).collect::<Vec<_>>().into_boxed_slice(), //Same thing as in the single-thread code, except the fact that we repass it into u64s
     }
+}
+```
+\
+There is no much to say about this function, except the fact that we use a parallelized iteration.
+\
+\
+=== Inverse NTT in single-thread
+\
+Now that we have our forward NTT function, we need to introduce the inverse NTT function. It's basically the same, except that we use inverse twiddles ($overline(t)$[k]) and that we scale by $n^(-1)$ at the end of the function. The INTT used is also from the _Homomorphic Encryption on GPU_ paper.
+\
+```rust
+fn inverse_ntt_single(
+    params: &RingParams, //We use the defined parameters,
+    polynomial: &Polynomial, //The polynomial to get back into "normal" domain
+    ntt_tables: &NTTprecaculated //The precalculated tables
+) -> Polynomial {
+    let mut coeffs: Vec<u64> = polynomial.coeffs.to_vec(); 
+
+    let n = params.n;
+    let q = params.q as u128;
+
+    let mut t: usize = 1; //This time, t starts with the value of 1.
+    let mut m: usize = n; //While m starts with the value of n. (it's the opposite of what we do in the NTT)
+
+    loop {
+        let h = m / 2; //Number of groups during this round
+        let mut j1: usize = 0; //First bound
+
+        for i in 0..h { //For each group
+            let j2 = j1 + t - 1; //the second bound
+
+            for j in j1..=j2 { //For each butterfly in the group
+                let u = coeffs[j] as u128;
+                let v = coeffs[j + t] as u128;
+
+                let sum = u + v; //We sum then reduce (just like in the NTT)
+                let sum = if sum >= q { sum - q } else { sum };
+                coeffs[j] = sum as u64;                
+
+                
+                let w = ntt_tables.twiddles_inv[h + i]; //But this time, we use the inversed twiddles
+                coeffs[j + t] = (((u + q - v) % q * w) % q) as u64;
+            }
+
+            j1 += 2 * t;  //We pass to the next group
+        }
+
+        t *= 2; //t is multiplied by two, while m is divided by two (exactly the opposite as in the NTT)
+        m /= 2; 
+
+        
+        if m <= 1 { break; } //When all coefficients are computed, we break
+    }
+
+    let n_inv = mod_pow(n as u128, q - 2, q); //Finally, we compute the inverse of n
+    for c in coeffs.iter_mut() {
+        *c = (*c * n_inv as u64) % q as u64; //And we scale each coefficent with n^(-1)
+    }
+
+    Polynomial {
+        coeffs: coeffs.into_iter().collect::<Vec<_>>().into_boxed_slice(),
+    }
+}
+```
+\
+Explanation :
+\
+\
+First, we now that the coeffs that are in the NTT domain (the input coefficients) are in the bit-reversed order : coeffs = $[â_0, â_4, â_2, â_6, â_1, â_5, â_3, â_7]$.
+\
+What we want is to get them back into the "normal" domain, but also get them back in the non-reversed order.
+\
+\ 
+In the inverse NTT, $t$ starts small and grows, so that :
+\
+\
+t=1:  [0]◄1►[1]  [2]◄1►[3]  [4]◄1►[5]  [6]◄1►[7] 
+\
+\
+t=2:  [0]◄─2─►[2]  [1]◄─2─►[3]  [4]◄─2─►[6]  [5]◄─2─►[7]
+\
+\
+t=4:  [0]◄──1──►[4]  [1]◄──4──►[5]  [2]◄──4──►[6]  [3]◄──4──►[7]
+\
+\
+It's exactly the inverse of the forward NTT.
+\
+In the INTT, $m$ is the total covered length, while h is the number of groupes :
+\
+\
+$m=8, h=4 => $ 4 groups of butterflies
+\
+\
+$m=4, h=2 => $ 2 groups of butterflies
+\
+\
+$m=2, h=1 => $ 1 groups of butterflies
+\
+\
+Why $h = m slash 2$ ? Because each group contains $t$ butterflies, so that the total number of nutterflies is constant ($n slash 2$). So, we need :
+\
+#align(center)[$h * t = n slash 2)$]
+#align(center)[$h = (n slash 2) slash t$]
+#align(center)[$h = m slash 2$]
+\
+\
+In the INTT, $j_1$ and $j_2$ are the bounds of the group, like in the NTT, but in another way :
+\
+For a group $i$ :
+\
+- $j_1$ is the sum of the length of the previous groups
+- $j_2 = j_1 + t - 1$
+\
+And $j$ is the index of $u$ in each butterfly.
+\
+\
+For example, with $n = 8$, at the second iteration ($t = 2, h = 2$) :
+\
+\
+Group $i = 0$ :
+\
+#align(center)[$j_1 = 0$]
+#align(center)[$j_2 = 0 + 2 - 1 = 1$]
+\
+#align(center)[Butterflies on coeffs[j]↔coeffs[j + t] and coeffs[j]↔coeffs[j + t].]
+#align(center)[Butterflies on coeffs[0]↔coeffs[2] and coeffs[1]↔coeffs[3].]
+#align(center)[$j_1 = j_1 + 2*t = 0 + 2 * 2 = 4$]
+\
+\
+\
+Group $i = 1$ :
+#align(center)[$j_2 = 4 + 2 - 1 = 5$]
+\
+#align(center)[Butterflies on coeffs[j]↔coeffs[j + t] and coeffs[j]↔coeffs[j + t].]
+
+#align(center)[Butterflies on coeffs[4]↔coeffs[6] and coeffs[5]↔coeffs[7].]
+#align(center)[ . . .]
+\
+\
+We can visualize like this, for example :
+\
+\
+Initial state : coeffs = $[â_0, â_4, â_2, â_6, â_1, â_5, â_3, â_7]$.
+\
+\
+Iteration 1 : $t=1$, $h=4, m=8$ :
+\                       
+\           
+#align(center)[Group $i=0$ : $j_1=0, j_2=0$ → $j=0$ : coeffs[0] ↔ coeffs[1] (twiddles[4])]
+#align(center)[Group $i=1$ : $j_1=2, j_2=2$ → $j=2$ : coeffs[2] ↔ coeffs[3] (twiddles[5])]
+#align(center)[Group $i=2$ : $j_1=4, j_2=4$ → $j=4$ : coeffs[4] ↔ coeffs[5] (twiddles[6])]
+#align(center)[Group $i=3$ : $j_1=6, j_2=6$ → $j=6$ : coeffs[6] ↔ coeffs[7] (twiddles[7])]
+\                                     
+4 groups of 1 butterfly, distance of 1                  
+\
+\
+\
+Iteration 2 : $t=2$, $m=2$ : 
+\
+\                                
+Group $i=0$ : $j_1=0$ , $j_2=1$ :                                
+#align(center)[j=0 : coeffs[0] ↔ coeffs[2]  (twiddle = twiddles[2])]
+#align(center)[j=1 : coeffs[1] ↔ coeffs[3]  (twiddle = twiddles[2])]
+\                                                    
+Group $i=1$ : $j_1=4$, $j_2=5$                                
+#align(center)[j=4 : coeffs[4] ↔ coeffs[6]  (twiddle = twiddles[3])]
+#align(center)[j=5 : coeffs[5] ↔ coeffs[7]  (twiddle = twiddles[3])]
+\
+2 groups of 2 butterflies, distance of 2            
+\
+Iteration 3 : $t=4$, $h=1$                                  
+\
+\
+Group $i=0$ : $j_1=0$,  $j_2=3$                                
+#align(center)[j=0 : coeffs[0] ↔ coeffs[4]  (twiddle = twiddles[1])]
+#align(center)[j=1 : coeffs[1] ↔ coeffs[5]  (twiddle = twiddles[1])]
+#align(center)[j=2 : coeffs[2] ↔ coeffs[6]  (twiddle = twiddles[1])]
+#align(center)[j=3 : coeffs[3] ↔ coeffs[7]  (twiddle = twiddles[1])]
+\
+4 groups of 1 butterfly, distance of 1                  
+
+Result : coeffs = $[a_0, a_1, a_2, a_3, a_4, a_5, a_6, a_7]$ (normal order)
+\
+\
+Why the twiddles_inv[h + i] ? Because the access to the twiddles follows the structure of the groups (see above). 
+\
+\
+Finally, you can see that the inverse NTT is the exact implementation of the mathematical formula ($omega^(- i hyph.point j)$ in the butterflies and $n^(-1)$ at the end), and the exact opposite of the computation of butterflies (opposite to the computation in the forward NTT).
+\
+\
+=== Inverse NTT in multi-thread
+\
+We can now also implement a parallelized version of the inverse NTT algorithm :
+\
+```rust 
+#[cfg(feature = "parallel")]
+fn inverse_ntt_multi(
+    params: &RingParams,
+    polynomial: &Polynomial,
+    ntt_tables: &NTTprecaculated
+) -> Polynomial {
+    let mut coeffs: Vec<u128> = polynomial.coeffs
+        .iter()
+        .map(|&c| c as u128)
+        .collect();
+
+    let n = params.n;
+    let q = params.q as u128;
+
+    let mut t: usize = 1; //We use the same parameters, the same base.
+    let mut m: usize = n;
+
+    loop {
+        let h = m / 2;
+
+    coeffs
+    .par_chunks_mut(2 * t) //We "cut" this time also by chunks of 2t
+    .enumerate()
+    .for_each(|(i, chunk)| {
+        let w = ntt_tables.twiddles_inv[h + i]; //Access to the inversed twiddles
+
+        for j in 0..t { //Exactly the same
+            let u = chunk[j];
+            let v = chunk[j + t];
+
+            let sum = u + v;
+            chunk[j] = if sum >= q { sum - q } else { sum };
+
+            chunk[j + t] = ((u + q - v) % q * w) % q;
+        }
+    });
+
+        t = t * 2;
+        m = m / 2;
+
+       
+        if m <= 1 { break; }
+    }
+
+    let n_inv = mod_pow(n as u128, q - 2, q); //Final scaling
+    for c in coeffs.iter_mut() {
+        *c = (*c * n_inv) % q;
+    }
+
+    Polynomial {
+        coeffs: coeffs.into_iter().map(|c| c as u64).collect::<Vec<_>>().into_boxed_slice(),
+    }
+}
+```
+\
+\
+== Polynomial multiplication with NTT <poly_mul_ntt>
+\
+We can finally implement what we need : the polynomial multiplication using the NTT, which is much more efficient than the naive multiplication. This function is really simple, since we already have done the hard job by implementing the NTT :
+\
+```rust
+#[inline]
+pub fn mul_ntt(&self, params: &RingParams, ntt_tables: &NTTprecaculated, polynomial: &Polynomial) -> Polynomial { //Function that computes the product of two polynomials by passing them in NTT domain.
+    let a = forward_ntt(params, self, ntt_tables); //First, we pass the polynomials into the NTT domain
+    let b = forward_ntt(params, polynomial, ntt_tables);
+
+    let mut c_ntt = Polynomial::zeros(params.n);
+
+    for i in 0..params.n {
+        c_ntt.coeffs[i] = ((a.coeffs[i] as u128 * b.coeffs[i] as u128) % params.q as u128) as u64; //Then, we just do a basic pointwise multiplication
+    }
+
+    inverse_ntt(params, &c_ntt, ntt_tables) //And we finally get back into the "normal" domain
+    
 }
 ```
