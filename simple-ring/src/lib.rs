@@ -3,7 +3,6 @@ pub mod ntt;
 pub mod polys;
 pub mod modular;
 pub mod sampling;
-pub mod errors;
 
 pub use ring::RingParams as RingParams;
 pub use polys::Polynomial as Polynomial;

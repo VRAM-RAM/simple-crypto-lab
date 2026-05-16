@@ -28,31 +28,37 @@ impl Polynomial {
 
 
     #[cfg(not(feature = "parallel"))]
-    pub fn sum(&self, params: &RingParams, polynomial: &Polynomial) -> Polynomial { 
+    pub fn sum(&self, params: &RingParams, polynomial: &Polynomial) -> Polynomial {
+        assert_eq!(self.coeffs.len(), polynomial.coeffs.len(), "The length of the two polynomials you're trying to sum doesn't match ! You may use parameters.n for both of the polynomials");
+
         Self::polynomial_sum_single( params,  self, polynomial)
     }
 
     #[cfg(not(feature = "parallel"))]   
     pub fn sub(&self, params: &RingParams, polynomial: &Polynomial) -> Polynomial {
+        assert_eq!(self.coeffs.len(), polynomial.coeffs.len(), "The length of the two polynomials you're trying to substract doesn't match ! You may use parameters.n for both of the polynomials");
+ 
         Self::polynomial_sub_single( params,  self, polynomial)
     }
 
     #[cfg(feature = "parallel")]
     pub fn sum(&self, params: &RingParams, polynomial: &Polynomial) -> Polynomial {
+        assert_eq!(self.coeffs.len(), polynomial.coeffs.len(), "The length of the two polynomials you're trying to sum doesn't match ! You may use parameters.n for both of the polynomials");
+
         Self::polynomial_sum_multi( params,  self, polynomial)
     }
 
     #[cfg(feature = "parallel")]
     pub fn sub(&self, params: &RingParams, polynomial: &Polynomial) -> Polynomial {
+        assert_eq!(self.coeffs.len(), polynomial.coeffs.len(), "The length of the two polynomials you're trying to multiply doesn't match ! You may use parameters.n for both of the polynomials");
         Self::polynomial_sub_multi( params,  self, polynomial)
     }
 
 
     #[inline]
     pub fn mul(&self, params: &RingParams, polynomial: &Polynomial) -> Self { //Function for naive multiplication, not to be used
-        assert_eq!(self.coeffs.len(), params.n);
-        assert_eq!(polynomial.coeffs.len(), params.n);
-        
+        assert_eq!(self.coeffs.len(), polynomial.coeffs.len(), "The length of the two polynomials you're trying to multiply doesn't match ! You may use parameters.n for both of the polynomials");
+
         let mut b = vec![0u64; 2 * params.n];
         
         for i in 0..params.n {
@@ -168,6 +174,7 @@ impl Polynomial {
 
     #[inline]
     pub fn mul_ntt(&self, params: &RingParams, ntt_tables: &NTTprecaculated, polynomial: &Polynomial) -> Polynomial { //Function that computes the product of two polynomials by passing them in NTTs.
+        assert_eq!(self.coeffs.len(), polynomial.coeffs.len(), "The length of the two polynomials you're trying to multiply doesn't match ! You may use parameters.n for both of the polynomials");
         let a = forward_ntt(params, self, ntt_tables);
         let b = forward_ntt(params, polynomial, ntt_tables);
 

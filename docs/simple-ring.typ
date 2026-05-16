@@ -38,7 +38,7 @@
 mathematical primitives for lattice-based cryptography.]
 
 Modern post-quantum cryptography (BFV, CKKS, Kyber, Dilithium) relies on the
-polynomial ring $Z_q = Z_q [X] slash (X^n + 1)$. Understanding this structure
+polynomial ring $ZZ_q = ZZ_q [X] slash (X^n + 1)$. Understanding this structure
 is essential for working with these schemes, but research papers are often complicated, and are often not written for educational purposes, especially in Rust.
 
 #strong[Goal:] Bridge the gap between abstract mathematics and concrete implementation.
@@ -57,7 +57,7 @@ Make everything you imagine with it, but *don't* use it with sensible datas.
 `simple-ring` provides:
 \
 \
-+ Polynomials in $Z_q$,
++ Polynomials in $ZZ_q$,
 + NTT/INTT for fast multiplication,
 + Modular arithmetic,
 + Sampling methods (CBD, Uniform)
@@ -259,7 +259,7 @@ The naive multiplication (not in the  ring) in noted as :
 \
 #align(center)[$M_k = sum_(i+j=k) A_i *B_j$]
 \
-Where $A, B$ are two polynomials and $M$ their product.
+Where $A, B$ are two polynomials and $M$ their product. Note that $A$ and $B$ should have exactly the same length.
 \
 So, let's implement it !
 #codly(languages: codly-languages)
@@ -509,22 +509,23 @@ cargo add simple-ring
 ```
 Then, in  your project :
 ```Rust
-use simple_ring::{Polynomial, RingParams, find_valid_omega};
+use simple_ring::{Polynomial, RingParams, find_valid_omega, precalculate};
 ```
 
 From this, you can use all the methods defined (code from the lib.rs of simple-ring):
 #codly(languages: codly-languages)
 ```rust
-#[cfg(test)]
-#[test]
 fn test_polynomials() {
     let params = RingParams::new(4, 17, find_valid_omega(4, 17)); //We define the parameters
+    let ntt_tables = &precalculate(&params);
     let mut coeffs = vec![0u64; 4]; //We create the coefficients for our first polynomial
     coeffs[3] = 8;
+    //In all the code, the polynomials should have the same length ! 
     let poly1 = Polynomial::new(coeffs.clone()); //We create the first polynomial as P1 = [0, 0, 0, 8]
     let poly2 = Polynomial::zeros(4); //We create an empty polynomial, which will be the second one.
     let sum = poly1.sum(&params, &poly2); //We execute the defined methods 
-    let mul = poly1.mul(&params, &poly2);
+    let mul = poly1.mul(&params, &poly2); 
+    let mul_ntt = poly1.mul_ntt(&params, ntt_tables, &poly2); 
     let scaled = poly1.scale(&params, 10);
     let divided = poly1.divide_by_constant(2);
     let reduced = poly1.reduce(2);
@@ -540,6 +541,9 @@ fn test_polynomials() {
     assert_eq!(poly1.coeffs, sum.coeffs);
     println!();
     println!("Product is : {:?}", mul);
+    assert_eq!(poly2.coeffs, mul.coeffs);
+    println!();
+    println!("Product with NTT is : {:?}", mul_ntt);
     assert_eq!(poly2.coeffs, mul.coeffs);
     println!();
     println!("Scaled first polynomial is : {:?}", scaled);
@@ -561,7 +565,7 @@ fn test_polynomials() {
     let mut coeffs = vec![0u64; 4];
     coeffs[3] = (-8 as i64).rem_euclid(params.q as i64) as u64;//We have to reduce because the opposite is done modulo q
     assert_eq!(coeffs.into_boxed_slice(), opposite.coeffs); 
-    println!();
+    println!()
 }
 ```
 
@@ -577,6 +581,8 @@ Sum is : Polynomial { coeffs: [0, 0, 0, 8] }
 
 Product is : Polynomial { coeffs: [0, 0, 0, 0] }
 
+Product with NTT is : Polynomial { coeffs: [0, 0, 0, 0] }
+
 Scaled first polynomial is : Polynomial { coeffs: [0, 0, 0, 12] }
 
 Divided first polynomial is : Polynomial { coeffs: [0, 0, 0, 4] }
@@ -586,8 +592,6 @@ Reduced first polynomial is : Polynomial { coeffs: [0, 0, 0, 0] }
 Opposite poly1 is : Polynomial { coeffs: [0, 0, 0, 9] }
 
 test test_polynomials ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 ```
 \
 So, the polynomial code is done, we can now approach the sampling !
@@ -1284,7 +1288,7 @@ So :
 It works !
 \
 #pagebreak()
-\
+
 == `ntt.rs` : implementing the NTT, in Rust
 \
 Now, we can - finally - implement the NTT in Rust. First, we'll detail the _twiddle precalculation_.
@@ -1838,3 +1842,60 @@ pub fn mul_ntt(&self, params: &RingParams, ntt_tables: &NTTprecaculated, polynom
     
 }
 ```
+= Errors
+\
+In `simple-ring`, I didn't implement Errors in a `errors.rs` file, with an enum (_RingError_ for example), and I didn't make all my functions return a `Result<Polynomial, RingError>`. Why ? Because it would have added more complexity. This implementation has to remain simple to use, as :
+\
+```rust 
+let params = RingParams::new(16, 17, find_valid_omega(16, 17));
+let ntt_tables = &precalculate(&params);
+let poly = Polynomial::new(vec![2u64; params.n]);
+let poly2 = Polynomial::new(vec![4u64; params.n]);
+let product = poly.mul_ntt(&params, ntt_tables, &poly2);
+```
+\
+And not :
+\
+```rust 
+let params = RingParams::new(16, 17, find_valid_omega(16, 17));
+let ntt_tables = &precalculate(&params);
+let poly = Polynomial::new(vec![2u64; params.n]);
+let poly2 = Polynomial::new(vec![4u64; params.n]);
+let product = poly.mul_ntt(&params, ntt_tables, &poly2).unwrap();
+```
+Nor 
+```rust 
+fn main() -> Result<(), RingError> {
+let params = RingParams::new(16, 17, find_valid_omega(16, 17));
+let ntt_tables = &precalculate(&params);
+let poly = Polynomial::new(vec![2u64; params.n]);
+let poly2 = Polynomial::new(vec![4u64; params.n]);
+let product = poly.mul_ntt(&params, ntt_tables, &poly2)?;
+}
+```
+\
+So, I decided to add _assert_eq!()_ in the code, to prevent silent errors. In the case where something is wrong, the code should panic, and explain in details what is the error, without needing a _?_ nor an _unwrap()_.
+#pagebreak()
+= References
+\
+[1] : Özcan, Ali & Ayduman, Can & Türkoğlu, Enes & Savaş, Erkay. (2023). Homomorphic Encryption on GPU. IEEE Access. PP. 1-1. 10.1109/ACCESS.2023.3265583. (#link(("https://eprint.iacr.org/2022/1222.pdf")))
+\
+\
+[2] : Sengupta, B., Gupta, P., & Sengupta, S. (2025). Introduction to Number Theoretic Transform. ArXiv, abs/2509.05884. (#link("https://arxiv.org/pdf/2509.05884"))
+\
+\
+[3] :  Damien Stehlé. Euclidean lattices: algorithms and cryptography. Cryptography and Security [cs.CR]. Ecole normale supérieure de lyon - ENS LYON, 2011. ⟨tel-00645387⟩. (#link("https://theses.hal.science/tel-00645387/"))
+\
+\
+[4] : Fermat's Little theorem, on Wikipedia (#link("https://en.wikipedia.org/wiki/Fermat%27s_little_theorem"))
+\
+\
+[5] : Ring, on Wikipedia (#link("https://en.wikipedia.org/wiki/Ring_(mathematics)"))
+\
+\
+[6] : Avanzi, Roberto. CRYSTALS-Kyber Algorithm Specifications And Supporting Documentation. 2017. (#link("https://pq-crystals.org/kyber/data/kyber-specification-round3-20210131.pdf"))
+\
+\
+[7] : S. Lee, J. Woo, J. Kim and J. H. Park, "Generalized Centered Binomial Distribution for Bimodal Lattice Signatures," in IEEE Access, vol. 13, pp. 2203-2214, 2025, doi: 10.1109/ACCESS.2024.3523521.
+keywords: {Gaussian distribution;Standards;Polynomials;Digital signatures;Lattices;Timing;Random variables;Newton method;Hypercubes;Cryptography;Post-quantum cryptography;lattice-based signatures;bimodal;binomial distribution}, (#link("https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=10817596"))
+
