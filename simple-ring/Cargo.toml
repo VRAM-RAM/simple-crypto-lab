@@ -1,6 +1,6 @@
 [package]
 name = "simple-ring"
-
+description = "Educational implementation of polynomial rings, NTT, and coefficient sampling for lattice-based cryptography" 
 documentation = "https://docs.rs/simple-ring" 
 keywords = ["cryptography", "ntt", "polynomial", "ring", "educational"]
 categories = ["cryptography", "mathematics"]

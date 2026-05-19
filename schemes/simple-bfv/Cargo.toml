@@ -1,6 +1,6 @@
 [package]
 name = "simple-bfv"
-
+description = "Educational implementation of BFV FHE scheme"  
 edition.workspace = true
 version.workspace = true
 license.workspace = true
