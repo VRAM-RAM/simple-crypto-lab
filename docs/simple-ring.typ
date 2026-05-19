@@ -38,7 +38,7 @@
 mathematical primitives for lattice-based cryptography.]
 
 Modern post-quantum cryptography (BFV, CKKS, Kyber, Dilithium) relies on the
-polynomial ring $ZZ_q = ZZ_q [X] slash (X^n + 1)$. Understanding this structure
+polynomial ring $R_q = ZZ_q [X] slash (X^n + 1)$. Understanding this structure
 is essential for working with these schemes, but research papers are often complicated, and are often not written for educational purposes, especially in Rust.
 
 #strong[Goal:] Bridge the gap between abstract mathematics and concrete implementation.
@@ -49,7 +49,7 @@ Before everything, I wanted to warn you about the security of this code. This co
 \
 So please don't use it in vulnerable environments. But, you can use it to experiment with schemes, you can re-use the NTT, the polynomial code... as you want.
 \
-Make everything you imagine with it, but *don't* use it with sensible datas.
+Make everything you imagine with it, but *don't* use it with sensitive data.
 \
 
 == What's inside ?
@@ -92,10 +92,10 @@ A ring is a mathematical structure where you can :
 \
 \
 + Add elements (integers for example),
-+ Substract elements (addition has inverses),
++ Subtract elements (addition has inverses),
 + Multiply elements (distributive over additions)
 \
-Think it as a structure where you can define operations and rules.
+Think of it as a structure where you can define operations and rules.
 
 The formal definition of a commutative ring is a set $R$ equipped with two operations : addition and multiplication.
 #table(
@@ -219,15 +219,15 @@ impl Polynomial {
     }
 }
 ```
-=== Polynomial substraction
+=== Polynomial subtraction
 \
-The polynomial substraction, in our ring, is noted as :
+The polynomial subtraction, in our ring, is noted as :
 #align(center)[$S_k = A_k - B_k mod q$]
 \
 So it's slightly the same thing as the sum. We write it in Rust :
 ```rust
 #[inline]
-fn polynomial_sub_single(params: &BFVParams, first: &Self, second: &Self) -> Self {
+fn polynomial_sub_single(params: &RingParams, first: &Self, second: &Self) -> Self {
     let mut coeffs = vec![0u64; params.n];
     for i in 0..params.n {
         coeffs[i] = ((first.coeffs[i] as i128 - second.coeffs[i] as i128).rem_euclid(params.q as i128)) as u64 ; //We convert into i128 so that we don't have an underflow. The rem_euclid makes the result remain euclidean, so that it is in the ring.
@@ -451,7 +451,7 @@ In Rust, it is written as :
 pub fn reduce(&self, constant: u128) -> Polynomial { //Function that reduce the polynomial by a constant (polynomial mod k)
     let new = self.coeffs
         .iter()
-        .map(|c| (*c as u128).rem_euclid(constant) as u64) //We consider that the constant is an u128. It is useless, since a polynomial is made of u64s (so that if the constant is greater than the MAX value that an u64 can store, it wouldn't reduce anything) but we keep it for maybe an evolution.
+        .map(|c| (*c as u128).rem_euclid(constant) as u64) //We consider that the constant is an u128. Currently unused since coefficients are u64, but retained for future extensibility.
         .collect();
     Polynomial::new(new)
 }
@@ -599,13 +599,13 @@ So, the polynomial code is done, we can now approach the sampling !
 #pagebreak()
 = `sampling.rs` : The coefficient sampling and generation
 \
-In `samplig.rs`, we implement the generation of coefficients for cryptographic implementations.
+In `sampling.rs`, we implement the generation of coefficients for cryptographic implementations.
 
 == The RNG 
 \
-A random number generator (RNG) is primordial in cryptograpy, because if the generated key & noise aren't random (if they are predictable, if they show patterns), the security of LWE is broken. In this project, we've choosen _OsRng_, a random number generator that calls the system generator (`/dev/getrandom` on Linux, for example.). The OS' RNG called is considered as secured because the generated bits depends on physical values like CPU temperature, disk activity, memory used...
+A random number generator (RNG) is essential in cryptograpy, because if the generated key & noise aren't random (if they are predictable, if they show patterns), the security of LWE is broken. In this project, we've choosen _OsRng_, a random number generator that calls the system generator (`/dev/getrandom` on Linux, for example.). The OS' RNG called is considered as secured because the generated bits depends on physical values like CPU temperature, disk activity, memory used...
 \
-So, the first thing to do, in `samplig.rs`, is to define the use of the RNG :
+So, the first thing to do, in `sampling.rs`, is to define the use of the RNG :
 #codly(languages: codly-languages)
 ```rust
 use crate::{Polynomial, RingParams};
@@ -648,7 +648,7 @@ impl Sample {
 In theory, we should use a gaussian distribution, but it has 2 major problems :
 
 + The sampling is slow and expensive
-+ It's implementation is complicated and source of many errors
++ Its implementation is complicated and source of many errors
 \
 So, we want to use something simpler, but with similar properties.
 Here comes the CBD. We can say that it is a discrete and simple approximation of the gaussian.
@@ -662,7 +662,7 @@ Where $b_i, b_i prime tilde.op {0, 1}$
 \
 Explanation :
 \
-We do the sum of choosen randomly bits, centered on 0, with a base borned in $[-eta, eta]$.
+We do the sum of randomly choosen bits, centered on 0, with a base borned in $[-eta, eta]$.
 \
 \
 Example :
@@ -676,9 +676,9 @@ Let's say we want to generate a coefficient, called $c$. With centered binomial 
 
 This method has many good points.
 \
-First, it's really fast : we don't call the generator as much as if we had to implement a gaussian distribution, and the operations are really simple (just a sum and a substraction, trivial for a CPU).
+First, it's really fast : we don't call the generator as much as if we had to implement a gaussian distribution, and the operations are really simple (just a sum and a subtraction, trivial for a CPU).
 \
-Also, as $eta$ grows, the distribution approaches from a gaussian#footnote[https://en.wikipedia.org/wiki/De_Moivre%E2%80%93Laplace_theorem] and, finally, the CBD is subgaussian.
+Also, as $eta$ grows, the distribution approaches a Gaussian#footnote[https://en.wikipedia.org/wiki/De_Moivre%E2%80%93Laplace_theorem] and, finally, the CBD is subgaussian.
 It's the perfect candidate for LWE cryptography, such as CRYSTAL-Kyber#footnote[https://pq-crystals.org/kyber/] or BFV#footnote[please see `/schemes/`].
 \
 \
@@ -728,7 +728,7 @@ pub fn generate_cbd_sample(n: usize, eta: usize) -> Sample {
 \
 === Generation of small coefficients
 \
-We will also need to generate small coefficients for our schemes. The generated coefficients will be in the alphabet ${-1, 0, 1}$.
+We will also need to generate small coefficients for our schemes. The generated coefficients will be in the set ${-1, 0, 1}$.
 \
 We simply implement it :
 \
@@ -739,7 +739,7 @@ pub fn generate_small_sample(params: &RingParams) -> Sample {
     let mut coeffs: Vec<i32> = Vec::with_capacity(params.n);
     
     for _ in 0..params.n {
-        let small: i32 = rng.gen_range(-1..=1); //We generate coeffs in the alphabet A = {-1, 0, 1}
+        let small: i32 = rng.gen_range(-1..=1); //We generate coeffs in the set A = {-1, 0, 1}
         coeffs.push(small);
     }
     
@@ -749,7 +749,7 @@ pub fn generate_small_sample(params: &RingParams) -> Sample {
 \
 === Uniform generation of coefficients in the Ring
 \
-Finally, we need to have a function for generating coefficients uniformly, in the entire ring, so in the alphabet ${0, 1, ..., q - 1}$.
+Finally, we need to have a function for generating coefficients uniformly, in the entire ring, so in the set ${0, 1, ..., q - 1}$.
 \
 ```rust
 #[inline]
@@ -768,9 +768,9 @@ pub fn generate_uniform_polynomial(params: &RingParams) -> Polynomial {
 We have now finished with the sampling. Now, we will approach the most difficult concept of this implementation : the NTT.
 
 #pagebreak()
-= Deeping into NTT <ntt> 
+= Delving into NTT <ntt> 
 \
-The Number Theoretic Transform is the equivalent of the FFT, but in modular arithmetic : while the FFT is computed on complex numbers and roots of unit as $omega^n = 1$, the NTT works on a finite field (the ring), with integers modulo $q$ and a primitive root modulo $q$.
+The Number Theoretic Transform is the equivalent of the FFT, but in modular arithmetic : while the FFT is computed on complex numbers and roots of unity as $omega^n = 1$, the NTT works on a finite field (the ring), with integers modulo $q$ and a primitive root modulo $q$.
 
 == The problem
 \
@@ -791,15 +791,15 @@ But also by the values of the polynomial in some points :
 #align(center)[$(A(omega^0), A(omega^1), A(omega^2))$]
 #align(center)[$(B(omega^0), B(omega^1), B(omega^2))$]
 \
-Where $omega$ is a root of the unit.
+Where $omega$ is a root of unity.
 \
 In this representation, we just have to multiply coefficient by coefficient to get the result of the polynomial multiplication.
 
 #pagebreak()
 == The maths behind NTT
-=== What is the root of a unit ?
+=== What is the root of unity ?
 \
-In standart arithmetic, a root of the unit is a number $omega$ as, for the unit $n$ :
+In standart arithmetic, a root of unity is a number $omega$ as, for the unity $n$ :
 #align(center)[$omega^n = 1$]
 \
 For example, for $n = 4$, $omega = i$ because $i^4 = 1$.
@@ -814,7 +814,7 @@ For example, for $q = 17$ and $n = 4$, $w = 4$ because $4^4 mod 17 = 256 mod 17 
 === What's a primitive root, and why is it important ?
 \
 A primitive root is a root that "generate" all the other ones.
-A number $w$ is a primitive root if :
+A number $omega$ is a primitive root if :
 #align(center)[$omega^n eq.triple 1 mod q$]
 #align(center)[$omega^k eq.triple.not 1 mod q$]
 Where $k < n$.
@@ -833,24 +833,24 @@ Or, if $omega$ isn't a primitive root, some of the values can repeet, and so we 
 
 === The negacyclic
 \
-In BFV,  work in the ring $ZZ_q [X] slash (X^n + 1)$, which means that $X^n eq.triple -1 mod (X^n + 1)$
+In BFV, we work in the ring $ZZ_q [X] slash (X^n + 1)$, which means that $X^n eq.triple -1 mod (X^n + 1)$
 . So, we need $omega^n eq.triple -1 mod q$.
 \
-The solution is to take a 2nth root of the unit, as :
+The solution is to take a 2nth root of unity, as :
 \
 #align(center)[$omega^(2n) eq.triple 1 mod q => omega^n eq.triple -1 mod q$]
 \
 Because $omega^(2n) = (omega^n)^2 eq.triple 1$, so $omega^n$ is a square root of $1$, and, in the ring, the square roots of $1$ are ${-1, 1}$. If $omega$ is a primitive 2nth root, $omega^n eq.not 1$, so $omega^n eq -1$.
 \
 \
-Now, we introduce the fact that $q eq.triple 1 mod 2n$. Why ? Because a primitive root 2nth of the unit exists in $ZZ_q$ if and *only* if $2n$ divides $(q-1)$.
+Now, we introduce the fact that $q eq.triple 1 mod 2n$. Why ? Because a primitive root 2nth of unity exists in $ZZ_q$ if and *only* if $2n$ divides $(q-1)$.
 \
 \
 For example, if we have $n = 4096$ and $q = 557 057$, it works, because :
 \
 #align(center)[$q - 1 mod 2n = 557 056 mod 8192 eq 0$]
 \
-In that case, $omega$ exists.
+In that case, a valid $omega$ exists.
 
 \
 == The NTT Transform
@@ -897,7 +897,7 @@ We've seen the formal definition of the forward NTT. But, to get back into the "
 It's formal definition is :
 \
 \
-#align(center)[$a_j = n^(-1) hyph.point sum_(j=0)^(n-1) â_j hyph.point omega^(-i hyph.point j) mod q$]
+#align(center)[$a_j = n^(-1) hyph.point sum_(i=0)^(n-1) â_i hyph.point omega^(-i hyph.point j) mod q$]
 \
 So, basically, the difference is in the $-i$ (we compute the inverse of $omega^(i hyph.point j)$) and the factor $n^(-1)$.
 \
@@ -1199,9 +1199,9 @@ First, let's implement an algorithm that tests if a number is prime or not.
 fn is_prime(n: u64) -> bool {
     if n < 2 { return false; }      // 0, 1 aren't primes
     if n == 2 { return true; }       // 2 is prime, and the only even prime 
-    if n.is_multiple_of(2) { return false; }  // Every other even number isn't prime
+    if n.is_multiple_of(2) { return false; }  // All other even numbers aren't prime
     
-    // Test of the divisors from 3 to √n
+    // Test divisors from 3 to √n
     let mut i = 3u64;
     while i * i <= n {              // Condition : i ≤ √n
         if n.is_multiple_of(i) {    // if i divide n
@@ -1233,7 +1233,7 @@ pub fn is_q_valid(n: usize, q: u64) -> bool {
         return false;
     }
     
-    if !is_prime(q) { //if it is prime, it can not be valid
+    if !is_prime(q) { //if it is not prime, it cannot be valid
         return false;
     }
     
@@ -1266,7 +1266,7 @@ pub fn find_valid_omega(n: usize, q: u64) -> u64 {
 Why does $e = (q -1) slash 2n $ ? :
 \
 \
-The function needs to return an integer so that $omega$ is a primitive 2nth root of the unit in $ZZ_q$:
+The function needs to return an integer so that $omega$ is a primitive 2nth root of unity in $ZZ_q$:
 + $omega^(2n) equiv 1 (mod q)$
 + $omega^n equiv -1 (mod q)$
 + $omega^k equiv.not 1 (mod q)$ for each $k < 2n$ 
@@ -1641,7 +1641,7 @@ Explanation :
 \
 First, we now that the coeffs that are in the NTT domain (the input coefficients) are in the bit-reversed order : coeffs = $[â_0, â_4, â_2, â_6, â_1, â_5, â_3, â_7]$.
 \
-What we want is to get them back into the "normal" domain, but also get them back in the non-reversed order.
+We want to recover the original coefficients in standard order.
 \
 \ 
 In the inverse NTT, $t$ starts small and grows, so that :
@@ -1670,7 +1670,7 @@ $m=4, h=2 => $ 2 groups of butterflies
 $m=2, h=1 => $ 1 groups of butterflies
 \
 \
-Why $h = m slash 2$ ? Because each group contains $t$ butterflies, so that the total number of nutterflies is constant ($n slash 2$). So, we need :
+Why $h = m slash 2$ ? Because each group contains $t$ butterflies, so that the total number of butterflies is constant ($n slash 2$). So, we need :
 \
 #align(center)[$h * t = n slash 2)$]
 #align(center)[$h = (n slash 2) slash t$]
@@ -1875,6 +1875,17 @@ let product = poly.mul_ntt(&params, ntt_tables, &poly2)?;
 ```
 \
 So, I decided to add _assert_eq!()_ in the code, to prevent silent errors. In the case where something is wrong, the code should panic, and explain in details what is the error, without needing a _?_ nor an _unwrap()_.
+#pagebreak()
+= Glossary
+\
+#table(
+  columns: 2,
+  [*Term*], [*Definition*],
+  [$R_q$], [Polynomial ring $ZZ_q [X] slash (X^n+1)$],
+  [NTT], [Number Theoretic Transform: FFT over finite fields],
+  [CBD], [Centered Binomial Distribution: discrete approximation of Gaussian],
+  [Twiddle], [Precomputed power of omega: $t_k = omega^k mod q$],
+)
 #pagebreak()
 = References
 \
