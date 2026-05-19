@@ -1,19 +1,14 @@
-
 [workspace]
 resolver = "2"
-
 members = [
     "simple-ring",
     "schemes/simple-bfv",
 ]
 
-
 [workspace.dependencies]
 rand = "0.8.0"
 rayon = "1.11.0"
-simple-ring = { path = "simple-ring" }
-
-
+simple-ring = "0.1.0"
 
 [workspace.package]
 edition = "2024"
@@ -21,3 +16,6 @@ license = "MIT OR Apache-2.0"
 version = "0.1.0"
 authors = ["Olruix (VRAM-RAM)"]
 repository = "https://github.com/VRAM-RAM/simple-crypto-lab"
+
+[patch.crates-io]
+simple-ring = { path = "simple-ring" }
