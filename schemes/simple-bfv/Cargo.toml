@@ -8,6 +8,7 @@ authors.workspace = true
 repository.workspace = true
 keywords = ["fhe", "bfv", "homomorphic", "cryptography", "educational"]
 categories = ["cryptography"]
+documentation = "https://docs.rs/simple-bfv" 
 
 
 [dependencies]
