@@ -9,8 +9,8 @@ use crate::polys::Polynomial;
 
 #[derive(Clone)]
 pub struct NTTprecaculated {
-    twiddles: Box<[u128]>,
-    twiddles_inv: Box<[u128]>,
+    pub twiddles: Box<[u128]>,
+    pub twiddles_inv: Box<[u128]>,
 }
 
 

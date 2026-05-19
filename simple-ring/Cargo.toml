@@ -1,7 +1,9 @@
-
 [package]
 name = "simple-ring"
 
+documentation = "https://docs.rs/simple-ring" 
+keywords = ["cryptography", "ntt", "polynomial", "ring", "educational"]
+categories = ["cryptography", "mathematics"]
 edition.workspace = true
 version.workspace = true
 license.workspace = true

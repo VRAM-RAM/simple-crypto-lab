@@ -9,24 +9,90 @@ pub struct BFVCiphertext {
 
 
 impl BFV {
-    pub fn generate_keys(&self) -> (Polynomial, Polynomial, Polynomial) { //The key generation. For informations about math formula, please see /docs/simple-bfv
+    //Utils :
+
+    //just return the noise threshold, knowing it's around Delta/2
+    pub fn noise_threshold(&self) -> u64 {
+        let delta = self.params.q / self.t;
+        delta / 2
+    }
+
+    /*Estimate noise magnitude after decryption.
+    # Warning
+    This method reveals information about the secret key and plaintext (obviously, because you HAVE to give the secret key).
+    Use ONLY for educational debugging in trusted environments. 
+     */
+    pub fn estimate_noise(&self, secret_key: &Polynomial, params: &RingParams, ciphertext: &BFVCiphertext) -> u64 {
+        let c1s = ciphertext.c1.mul_ntt(params, &self.ntt_precalculated, secret_key);
+        let m_prime = ciphertext.c0.sub(params, &c1s);
+        
+        let mut max_noise = 0u64;
+        let q = params.q as i128;
+        let delta = (params.q / self.t) as i128; 
+        
+        for &coeff in m_prime.coeffs.iter() {
+            let centered = if coeff as i128 > q / 2 { 
+                coeff as i128 - q 
+            } else { 
+                coeff as i128 
+            };
+            let remainder = centered.abs() % delta;
+            let noise = remainder.min(delta - remainder) as u64;
+            if noise > max_noise { max_noise = noise; }
+        }
+        max_noise
+    }
+
+
+    //The key generation. For informations about math formula, please see /docs/simple-bfv
+
+    pub fn generate_public_b(&self, a: &Polynomial, s: &Polynomial) -> Polynomial { 
         let params = &self.params;
-        let ntt_tables = &self.ntt_precalculated;
-        let a = generate_uniform_polynomial(params);
-        let s = generate_small_sample(params);
-        let s = s.to_poly(params.q);
+        let ntt_tables = &self.ntt_precalculated;        
         let e = generate_cbd_sample(params.n, self.eta);
         let e = e.to_poly(params.q);
         let mul = a.mul_ntt(params, ntt_tables, &s);
         let b = mul.sum(params, &e);
 
-        (a, b, s)
+        b
     }
 
-    pub fn encrypt(&self, message: &BFVPlaintext, public_key: (&Polynomial, &Polynomial)) -> BFVCiphertext { //The encryption. Same, you'll find the explanation in /docs/simple-bfv
+
+    pub fn generate_public_a(&self) -> Polynomial {
         let params = &self.params;
+        generate_uniform_polynomial(params)
+    }
+
+
+    pub fn generate_secret_key(&self)  -> Polynomial {
+        let params = &self.params;
+        let s = generate_small_sample(params);
+        s.to_poly(params.q)
+    }
+
+
+    //Encryption & Decryption
+
+
+    pub fn encrypt(&self, message: &BFVPlaintext, public_a: &Polynomial, public_b: &Polynomial) -> BFVCiphertext { //The encryption. Same, you'll find the explanation in /docs/simple-bfv
+        let params = &self.params;    
+        assert_eq!(
+            message.plain.coeffs.len(),
+            params.n,
+            "Plaintext degree mismatch: expected {}, got {}",
+            params.n, message.plain.coeffs.len()
+        );
+        
+        assert_eq!(
+            public_a.coeffs.len(), params.n,
+            "Public key a(x) degree mismatch"
+        );
+        assert_eq!(
+            public_b.coeffs.len(), params.n,
+            "Public key b(x) degree mismatch"
+        );
+
         let ntt_tables = &self.ntt_precalculated;
-        let (a, b) = public_key;
         
         let u = generate_small_sample(params);
         let u = u.to_poly(params.q);
@@ -39,19 +105,33 @@ impl BFV {
         
         let delta = params.q / self.t;
         
-        let bu = b.mul_ntt(params, ntt_tables, &u);
+        let bu = public_b.mul_ntt(params, ntt_tables, &u);
         let delta_m = message.plain.scale(params, delta);
         let c0_temp = bu.sum(params, &e1);
         let c0 = c0_temp.sum(params, &delta_m);
         
-        let au = a.mul_ntt(params, ntt_tables, &u);
+        let au = public_a.mul_ntt(params, ntt_tables, &u);
         let c1 = au.sum(params, &e2);
 
         BFVCiphertext { c0, c1 }
     }
 
+
+
     pub fn backend_decrypt(&self, ciphertext: &BFVCiphertext, secret_key: &Polynomial) -> Polynomial { //The backend decryption. Same, you'll find the explanation at /docs/simple-bfv
         let params = &self.params;
+        assert_eq!(
+            ciphertext.c0.coeffs.len(), params.n,
+            "Ciphertext c0 degree mismatch"
+        );
+        assert_eq!(
+            ciphertext.c1.coeffs.len(), params.n,
+            "Ciphertext c1 degree mismatch"
+        );
+        assert_eq!(
+            secret_key.coeffs.len(), params.n,
+            "Secret key degree mismatch"
+        );
         let ntt_tables = &self.ntt_precalculated;
         let c1s = ciphertext.c1.mul_ntt(params, ntt_tables, secret_key);
         let m_prime = ciphertext.c0.sub(params, &c1s);
@@ -74,8 +154,21 @@ impl BFV {
             Polynomial::new(coeffs)
     }
 
+
     pub fn decrypt(&self, ciphertext: &BFVCiphertext, secret_key: &Polynomial) -> String { //The decryption. Same, you'll find the explanation at /docs/simple-bfv
         let params = &self.params;
+        assert_eq!(
+            ciphertext.c0.coeffs.len(), params.n,
+            "Ciphertext c0 degree mismatch"
+        );
+        assert_eq!(
+            ciphertext.c1.coeffs.len(), params.n,
+            "Ciphertext c1 degree mismatch"
+        );
+        assert_eq!(
+            secret_key.coeffs.len(), params.n,
+            "Secret key degree mismatch"
+        );
         let ntt_tables = &self.ntt_precalculated;
         let c1s = ciphertext.c1.mul_ntt(params, ntt_tables, secret_key);
         let m_prime = ciphertext.c0.sub(params, &c1s);
@@ -97,6 +190,8 @@ impl BFV {
             
             BFVPlaintext { plain: Polynomial::new(coeffs), len: params.n }.decode()
     }
+
+    //Homomorphic operations
 
     pub fn sum_ciphertexts(&self, first_cipher: BFVCiphertext, second_cipher: BFVCiphertext) -> BFVCiphertext { //Function to sum two ciphertexts
         let params = &self.params;
@@ -127,24 +222,8 @@ impl BFV {
         BFVCiphertext { c0: new_c0, c1: new_c1 }
     }
 
-    pub fn estimate_noise(&self, secret_key: &Polynomial, params: &RingParams, ciphertext: &BFVCiphertext) -> u64 {
-        let c1s = ciphertext.c1.mul_ntt(params, &self.ntt_precalculated, secret_key);
-        let m_prime = ciphertext.c0.sub(params, &c1s);
-        
-        // Compute max absolute coefficient after centering
-        let mut max_noise = 0u64;
-        let q = params.q as i128;
-        for &coeff in m_prime.coeffs.iter() {
-            let centered = if coeff as i128 > q / 2 { 
-                coeff as i128 - q 
-            } else { 
-                coeff as i128 
-            };
-            let noise = centered.abs() as u64;
-            if noise > max_noise { max_noise = noise; }
-        }
-        max_noise
-    }
+
+
 }
 
 
