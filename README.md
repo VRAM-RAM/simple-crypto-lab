@@ -22,7 +22,7 @@ For production use, consider audited library, like :
 + [OpenFHE](https://openfhe.org/)
 + [liboqs](https://github.com/open-quantum-safe/liboqs)
 
-If you need a Rust implementation, please see [fhe.rs](https://github.com/tlepoint/fhe.rs), or  but it isn't audited.
+If you need a Rust implementation, please see [fhe.rs](https://github.com/tlepoint/fhe.rs),  but it isn't audited.
 
 ## Workspace structure
 
@@ -101,7 +101,7 @@ cargo doc --workspace --open
 
 cd docs
 typst compile simple-ring.typ
-typst compile simple-bfv.typ*
+typst compile simple-bfv.typ
 ```
 
 ### What you'll learn 
