@@ -24,30 +24,36 @@ For production use, consider audited library, like :
 + [OpenFHE](https://openfhe.org/)
 + [liboqs](https://github.com/open-quantum-safe/liboqs)
 
-If you need a Rust implementation, please see [fhe.rs](https://github.com/tlepoint/fhe.rs), but it isn't audited.
+If you need a Rust implementation, please see [fhe.rs](https://github.com/tlepoint/fhe.rs), or  but it isn't audited.
 
 ## Workspace structure
 
 ```bash
 .
-├── Cargo.toml 
-├── docs #Documentations for the crates (pdf & typst)
-│   ├── simple-bfv.typ 
+├── Cargo.toml
+├── docs #The documentation
+│   ├── simple-bfv.pdf
+│   ├── simple-bfv.typ
+│   ├── simple-ring.pdf
 │   └── simple-ring.typ
+├── LICENSE-APACHE #Licenses
+├── LICENSE-MIT
 ├── README.md
 ├── schemes
-│   └── simple-bfv #implemented schemes (only BFV for now)
+│   ├── README.md #Local README for schemes
+│   └── simple-bfv #BFV implementation (simple-bfv crate)
 │       ├── Cargo.toml
+│       ├── README.md
 │       └── src
 │           ├── config.rs
 │           ├── find_parameters.rs
 │           ├── lib.rs
 │           ├── plaintext.rs
 │           └── scheme.rs
-└── simple-ring # simple-ring, the crate that contains mathematical primitives for all the workspace members
-    ├── Cargo.toml 
+└── simple-ring #simple-ring crate
+    ├── Cargo.toml
+    ├── README.md
     └── src
-        ├── errors.rs
         ├── lib.rs
         ├── modular.rs
         ├── ntt.rs
@@ -112,8 +118,6 @@ typst compile simple-bfv.typ*
 
 `parallel` : Enable multithreaded NTT and polynomial code with rayon. In fact, it can be less efficient than the single thread code...
 
-### Performances 
-
 ### Contributing
 
 Contributions are welcome, especially : 
@@ -124,7 +128,7 @@ Contributions are welcome, especially :
 
 ### License 
 
-The code is licensed under MIT License. Please see `/license/` for more informations.
+The code is licensed under MIT or Apache-2.0, your choice.
 
 
 ### Contact
