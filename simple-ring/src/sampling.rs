@@ -16,7 +16,7 @@ impl Deref for Sample {
 
 impl Sample {
     pub fn to_poly(self, q:u64) -> Polynomial {
-        let coeffs = self.iter().map(|v| (*v).rem_euclid(q as i32) as u64).collect();
+        let coeffs = self.iter().map(|v| (*v as i128).rem_euclid(q as i128) as u64).collect();
         Polynomial::new(coeffs)
     }
 }
