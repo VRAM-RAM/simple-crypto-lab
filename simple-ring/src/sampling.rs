@@ -2,6 +2,8 @@
 use crate::{Polynomial, RingParams};
 use rand::{Rng, RngCore, rngs::OsRng};
 use std::ops::Deref;
+use shake::{Shake128};
+use shake::digest::{Update, ExtendableOutput, XofReader};
 
 #[derive(Clone, Debug)]
 pub struct Sample(pub Vec<i32>);
@@ -94,4 +96,26 @@ pub fn generate_uniform_polynomial(params: &RingParams) -> Polynomial { //Intern
     }
 
     Polynomial { coeffs: coeffs.into_boxed_slice() }
+}
+
+#[inline]
+pub fn generate_then_shake(params: &RingParams) -> Sample {
+    let mut rng = OsRng;
+
+    let mut seed = [0u8; 32];
+    rng.fill_bytes(&mut seed);
+
+    let mut hasher = Shake128::default();
+    hasher.update(&seed);
+    let mut reader = hasher.finalize_xof();
+
+    let mut buf = vec![0u8; params.n];
+    reader.read(&mut buf);
+
+    let coeffs: Vec<i32> = buf
+        .into_iter()
+        .map(|b| (b as i32) - 128) 
+        .collect();
+
+    Sample(coeffs)
 }
