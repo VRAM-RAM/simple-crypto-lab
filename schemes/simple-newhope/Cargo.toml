@@ -1,0 +1,19 @@
+[package]
+name = "simple-newhope"
+description = "Educational implementation of New Hope KEM"  
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords = ["kem", "newhope", "pqc", "cryptography", "educational"]
+categories = ["cryptography"]
+documentation = "https://docs.rs/simple-newhope" 
+
+
+[dependencies]
+rand.workspace = true
+rayon = { workspace = true, optional = true }
+
+simple-ring.workspace = true
+
