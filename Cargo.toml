@@ -3,7 +3,7 @@ resolver = "2"
 members = [
     "simple-ring",
     "schemes/simple-bfv",
-    "schemes/simple-newhope",
+    "schemes/simple-saber",
 ]
 
 [workspace.dependencies]

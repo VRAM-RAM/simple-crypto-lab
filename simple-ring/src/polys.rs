@@ -178,14 +178,18 @@ impl Polynomial {
         let a = forward_ntt(params, self, ntt_tables);
         let b = forward_ntt(params, polynomial, ntt_tables);
 
-        let mut c_ntt = Polynomial::zeros(params.n);
-
-        for i in 0..params.n {
-            c_ntt.coeffs[i] = ((a.coeffs[i] as u128 * b.coeffs[i] as u128) % params.q as u128) as u64;
-        }
+        let c_ntt = a.pointwise_mul(params, &b);
 
         inverse_ntt(params, &c_ntt, ntt_tables)
         
     }
 
+    #[inline]
+    pub fn pointwise_mul(&self, params: &RingParams, polynomial: &Polynomial) -> Polynomial { //Function that computes the pointwise mul of two Polynomials (a ◦ b)
+        let mut result = vec![0u64; params.n];
+        for i in 0..params.n {
+            result[i] = ((self.coeffs[i] as u128 * polynomial.coeffs[i] as u128) % params.q as u128) as u64;
+        }
+        Polynomial::new(result)
+    }
 }

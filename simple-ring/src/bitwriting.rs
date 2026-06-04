@@ -24,7 +24,7 @@ impl BitWriter {
         }
     }
 
-    pub fn write_bits(&mut self, mut value: u16, bits: usize) {
+    pub fn write_bits(&mut self, mut value: u64, bits: usize) {
         for _ in 0..bits {
             self.write_bit((value & 1) as u8);
             value >>= 1;

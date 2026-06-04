@@ -5,6 +5,11 @@ use std::ops::Deref;
 use shake::{Shake128};
 use shake::digest::{Update, ExtendableOutput, XofReader};
 
+pub enum SeedType {
+    NotGiven,
+    Given([u8; 32])
+}
+
 #[derive(Clone, Debug)]
 pub struct Sample(pub Vec<i32>);
 
@@ -99,23 +104,39 @@ pub fn generate_uniform_polynomial(params: &RingParams) -> Polynomial { //Intern
 }
 
 #[inline]
-pub fn generate_then_shake(params: &RingParams) -> Sample {
+pub fn generate_then_shake(params: &RingParams, seed_type: SeedType) -> (Sample, [u8; 32]) {
     let mut rng = OsRng;
 
-    let mut seed = [0u8; 32];
-    rng.fill_bytes(&mut seed);
+    match seed_type {
+        SeedType::Given(seed) => {
+            let buf = shake_128(seed, params.n);
+            let coeffs: Vec<i32> = buf
+                .into_iter()
+                .map(|b| (b as i32) - 128) 
+                .collect(); 
+            
+            return (Sample(coeffs), seed)
+        }
+        SeedType::NotGiven => {
+            let mut seed = [0u8; 32];
+            rng.fill_bytes(&mut seed);
+            let buf = shake_128(seed, params.n);
+            let coeffs: Vec<i32> = buf
+                .into_iter()
+                .map(|b| (b as i32) - 128) 
+                .collect(); 
+            
+            return (Sample(coeffs), seed)
+        }
+    }
+}
 
+pub fn shake_128(seed: [u8; 32], n: usize) -> Vec<u8> {
     let mut hasher = Shake128::default();
     hasher.update(&seed);
     let mut reader = hasher.finalize_xof();
 
-    let mut buf = vec![0u8; params.n];
+    let mut buf = vec![0u8; n];
     reader.read(&mut buf);
-
-    let coeffs: Vec<i32> = buf
-        .into_iter()
-        .map(|b| (b as i32) - 128) 
-        .collect();
-
-    Sample(coeffs)
-}
+    buf
+} 
