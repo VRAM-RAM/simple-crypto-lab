@@ -1,6 +1,5 @@
 
 use crate::{Saber};
-use rand::{RngCore, rngs::OsRng};
 use simple_ring::{Polynomial, RingParams, generate_cbd_sample, generate_small_sample, generate_then_shake};
 use blake3::derive_key;
 
@@ -19,7 +18,7 @@ impl SaberKeypair {
 }
 
 
-
+#[derive(Debug)]
 pub struct SaberCiphertext {
     pub v: Polynomial,
     pub u: Polynomial,
@@ -41,23 +40,27 @@ impl Saber {
         Polynomial::new(result)
     }
 
-    fn encode(&self, params: &RingParams, m: &Polynomial) -> Polynomial {
-        let p = self.p;
-        let t = self.t;
-        let factor = p / t;
+    pub fn encode(&self, params: &RingParams, m: &Polynomial) -> Polynomial {
+        let p = self.p;       // ex: 64 
+        let t = self.t;       // ex: 2
+        let factor = p / t;   // ex: 32
+        
         m.scale(params, factor)
     }
 
-    fn decode(&self, params: &RingParams, encoded: &Polynomial) -> Polynomial {
-        let p = self.p as i128;
-        let t = self.t as i128;
+    pub fn decode(&self, params: &RingParams, encoded: &Polynomial) -> Polynomial {
+        let p = self.p;       // ex: 64
+        let quarter_p = p / 4;       // 16
+        let three_quarter_p = 3 * p / 4; // 48
         let mut coeffs = vec![0u64; params.n];
+    
         for i in 0..params.n {
-            let raw = encoded.coeffs[i] as i128;
-            
-            let decoded = ((raw * t + p / 2).div_euclid(p) % t + t) % t ;
-
-            coeffs[i] = decoded as u64;
+            let raw = encoded.coeffs[i] % p;
+            if raw >= quarter_p && raw < three_quarter_p {
+                coeffs[i] = 1;
+            } else {
+                coeffs[i] = 0;
+            }
         }
         Polynomial::new(coeffs)
     }
@@ -74,7 +77,6 @@ impl Saber {
         let s = generate_small_sample(params).to_poly(q);
        
         let b = a.mul_ntt(params, ntt_tables, &s);
-        let b = b.divide_by_constant(self.p as u128);
         let b = self.round(params, b);
 
         SaberKeypair::new(b, seed, s)
@@ -90,18 +92,26 @@ impl Saber {
         let n = params.n;
         let ntt_tables = &self.ntt_precalculated;
 
-        let a = generate_then_shake(params, simple_ring::SeedType::Given(seed)).0.to_poly(q); //Yes, it's barely unreadable, but it works
+        let a = generate_then_shake(params, simple_ring::SeedType::Given(seed)).0.to_poly(q);
         
         let r = generate_cbd_sample(n, self.eta).to_poly(q);
+        
+        let mut r_compressed = vec![0u64; n];
+        for i in 0..n {
+            let val = r.coeffs[i] as i64;
+            r_compressed[i] = ((val % self.p as i64) + self.p as i64).rem_euclid(self.p as i64) as u64;
+        }
+        let r_compressed = Polynomial::new(r_compressed);
 
-        let u = a.mul_ntt(params, ntt_tables,&r);
+        let u = a.mul_ntt(params, ntt_tables, &r_compressed);
         let u = self.round(params, u);
 
-        let v = b.mul_ntt(params, ntt_tables,&r); 
+        let v = b.mul_ntt(params, ntt_tables, &r_compressed); 
         let v = self.round(params, v);
 
         let encoded_message = self.encode(params, message);
-        let v_message: Polynomial = v.sum(params, &encoded_message);
+        
+        let v_message = v.sum(params, &encoded_message);
 
         SaberCiphertext { v: v_message, u }
     }
@@ -115,36 +125,22 @@ impl Saber {
         let u = &encapsulated.u;
         let v = &encapsulated.v;
 
-        let su = s.mul_ntt(params, ntt_tables, &u);
-        
-        let encoded_message = v.sub(params, &su);
+        let su = s.mul_ntt(params, ntt_tables, u);
+        let su = self.round(params, su);  
 
-        self.decode(params, &encoded_message)
-    }
+        let m_poly = v.sub(params, &su);
 
-    pub fn encapsulate(&self, public_key: SaberPublicKey) -> (SaberCiphertext, Key) {
-        let n = self.params.n;
-
-        let mut buffer = vec![0u8; n];
-        let mut rng = OsRng;
-        rng.fill_bytes(&mut buffer);
-
-        let coeffs = buffer.iter().map(|v| *v as u64).collect();
-        let keypoly = Polynomial::new(coeffs);
-
-        assert_eq!(keypoly.coeffs.len(), n, "The size of the key and the size defined in the parameters don't match.");
-
-        let encrypted = self.encrypt(&public_key, &keypoly); 
-
-        let key = derive_key("SaberKeyDerivation", &buffer);
-
-        (encrypted, key)
+        self.decode(params, &m_poly)
     }
 
     pub fn decapsulate(&self, keypair: SaberKeypair, ciphertext: SaberCiphertext) -> Key {
         let decrypted = self.decrypt(&keypair, &ciphertext);
-        let bytes: Vec<u8> = decrypted.coeffs.iter().map(|v| *v as u8).collect();
-
+        let mut bytes = vec![0u8; self.params.n / 8];
+        for (i, &coeff) in decrypted.coeffs.iter().enumerate() {
+            if coeff & 1 == 1 { 
+                bytes[i / 8] |= 1 << (i % 8);
+            }
+        }
         derive_key("SaberKeyDerivation", &bytes)
     }
 }
