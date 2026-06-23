@@ -37,6 +37,11 @@ To run the tests, or modify the code, you can git clone the repo, and then run t
 cargo test --release -- --nocapture
 ```
 
+
+## Repository
+
+`simple-bfv` is a scheme from [`simple-crypto-lab`](https://github.com/VRAM-RAM/simple-crypto-lab).
+
 ## License 
 
-This code is licensed under the same license as `simple-crypto-lab`, so under MIT or APACHE 2.0 License, your choice.
+This code is licensed under the same license as `simple-crypto-lab`, so under CECILL-B or APACHE 2.0 License, your choice.

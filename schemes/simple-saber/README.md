@@ -39,4 +39,4 @@ cargo test --release -- --nocapture
 
 ## License 
 
-This code is licensed under the same license as `simple-crypto-lab`, so under MIT or APACHE 2.0 License, your choice.
+This code is licensed under the same license as `simple-crypto-lab`, so under CECILL-B or APACHE 2.0 License, your choice.
