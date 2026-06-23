@@ -126,7 +126,7 @@ Contributions are welcome, especially :
 
 ### License 
 
-The code is licensed under MIT or Apache-2.0, your choice.
+The code is licensed under CECILL-B or Apache-2.0, your choice.
 
 
 ### Contact
