@@ -13,6 +13,7 @@ authors.workspace = true
 rand.workspace = true
 rayon = { workspace = true, optional = true }
 shake = "0.1.0"
+bytemuck = "1.16"
 
 
 [features]

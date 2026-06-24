@@ -1,6 +1,7 @@
 mod config;
 mod scheme;
-
+mod encapsulation;
+mod error;
 pub use config::{Saber};
 pub use scheme::{Key, SaberCiphertext, SaberKeypair, SaberPublicKey};
 
@@ -16,18 +17,11 @@ in consequence a compatible ciphertext modulus.
 #[cfg(test)]
 #[test]
 fn test_encrypt_decrypt_roundtrip() {
-    use rand::{RngCore, rngs::OsRng};
-
     use simple_ring::Polynomial;
     let saber = Saber::light();
     let kp = saber.keygen();
     
-    let mut rng: OsRng = OsRng;
-    let mut coeffs = vec![0u64; saber.params.n];
-    for c in coeffs.iter_mut() {
-        *c = rng.next_u32() as u64 & 1;
-    }
-    let msg = Polynomial::new(coeffs);
+    let msg = Polynomial::random(saber.params.n);
     
     let ct = saber.encrypt(&kp.public_key, &msg);
     let decrypted = saber.decrypt(&kp, &ct);

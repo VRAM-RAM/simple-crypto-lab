@@ -209,11 +209,5 @@ impl Saber {
         self.decode(params, &m_poly) //Final decoding, in Z_p
     }
 
-    pub fn encapsulate(&self, secret_key: &SaberSecretKey) -> SaberCiphertext {
-        todo!("Code the encapsulation function with FO transform / Naive ciphered hash with key")
-    }
 
-    pub fn decapsulated(&self, keypair: &SaberKeypair) -> [u8; 32] {
-        todo!("Code the decapsulattion function with FO transform / Naive ciphered hash with key")
-    }
 }

@@ -1,12 +1,13 @@
 
+use rand::RngCore;
+use rand::rngs::OsRng;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;          
 #[cfg(feature = "parallel")]
 use rayon::slice::ParallelSliceMut;
 use crate::RingParams;
 use crate::ntt::{NTTprecaculated, inverse_ntt, forward_ntt};
-
-
+use bytemuck::checked::cast_slice;
 
 
 #[derive(Debug, Clone)]
@@ -14,14 +15,45 @@ pub struct Polynomial { //The polynomial struct, one of the bricks of the projec
     pub coeffs: Box<[u64]>,    
 }
 
+#[allow(dead_code)]
+pub trait ToPoly {
+    fn to_poly(&self) -> Polynomial;
+}
+
+impl<'a> ToPoly for &'a [u8] {  
+    fn to_poly(&self) -> Polynomial {
+        let coeffs: Vec<u64> = self
+            .chunks(8)
+            .map(|chunk| {
+                let mut bytes = [0u8; 8];
+                bytes[..chunk.len()].copy_from_slice(chunk);
+
+                u64::from_le_bytes(bytes)
+            })
+            .collect();
+        Polynomial::new(coeffs)
+    }
+}
 
 impl Polynomial {
     pub fn new(coeffs: Vec<u64>) -> Self { //Creates, from existing coefficients, a Polynomial.
         Self { coeffs: coeffs.into_boxed_slice() }
     }
 
+    pub fn random(n: usize) -> Self {
+        let mut coeffs = vec![0u64; n];
+        for c in coeffs.iter_mut() {
+        *c = OsRng.next_u64() & 1;
+        }
+        Polynomial::new(coeffs)
+    }
+
     pub fn zeros(n: usize) -> Self { //Creates an empty Polynomial.
         Self { coeffs: vec![0u64; n].into_boxed_slice() }
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        cast_slice(&self.coeffs)
     }
 
     //Code for calling single or parallel polynomial code
