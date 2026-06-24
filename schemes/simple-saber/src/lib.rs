@@ -24,7 +24,7 @@ fn test_encrypt_decrypt_roundtrip() {
     let saber = Saber::light();
     let kp = saber.keygen();
     
-    let msg = Polynomial::random(saber.params.n);
+    let msg = Polynomial::random_binary(saber.params.n);
     
     let ct = saber.encrypt(&kp.public_key, &msg);
     let decrypted = saber.decrypt(&kp, &ct);
@@ -35,14 +35,18 @@ fn test_encrypt_decrypt_roundtrip() {
 #[cfg(test)]
 #[test]
 fn test_encapdecap() {
+    use crate::encapsulation::SaberDecapsulate;
     let saber = Saber::light();
     let kp = saber.keygen();
-    let (key, encapsulated) = saber.encapsulate(&kp.public_key);
-    let recovered = match encapsulated.decapsulate(&kp) {
+    let (key, serialized_enc) = match saber.encapsulate(&kp.public_key) {
+        Ok((key, serialized)) => (key, serialized),
+        Err(e) => panic!("Error while encapsulating : {:?}", e),
+    };
+    let recovered = match serialized_enc.decapsulate(&kp) {
         Ok(key) => key,
         Err(e) => { panic!("Error while decapsulating : {:?}", e) }
     };
-    assert_eq!(key, recovered, "Error : the encapsulated key and the decapsulated key doens't match !")
+    assert_eq!(key, recovered, "Error : the encapsulated key and the decapsulated key doesn't match !")
 }
 
 #[test]

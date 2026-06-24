@@ -28,7 +28,15 @@ impl Sample {
     }
 }
 
-
+impl Polynomial {
+    pub fn random_binary(n: usize) -> Self {
+        let mut coeffs = vec![0u64; n];
+        for c in coeffs.iter_mut() {
+        *c = OsRng.next_u64() & 1;
+        }
+        Polynomial::new(coeffs)
+    }
+}
 
 #[inline]
 pub fn generate_cbd_sample(n: usize, eta: usize) -> Sample { //Inter function to create Centered Binomial Distribution

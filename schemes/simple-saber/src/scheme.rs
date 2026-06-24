@@ -4,6 +4,7 @@ use simple_ring::{
     generate_small_sample, generate_then_shake,
 };
 use crate::types::{SaberKeypair, SaberPublicKey};
+use serde::{Serialize, Deserialize};
 
 /*
 This file provides the core for the simple implementation of SABER scheme in Rust, using primitives given
@@ -12,7 +13,7 @@ please read '/docs/pdf/simple-saber.pdf. (upcoming)
 */
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SaberCiphertext {
     pub v: Polynomial, //The ciphertext V
     pub u: Polynomial, //The other public key, noted as U or B' 
@@ -144,8 +145,8 @@ impl Saber {
     }
 
     pub fn encrypt(&self, public_key: &SaberPublicKey, message: &Polynomial) -> SaberCiphertext {
-        let seed = public_key.1;
-        let b = &public_key.0; // In Z_p
+        let seed = public_key.a_seed;
+        let b = &public_key.b; // In Z_p
 
         let params = &self.params;
         let q = params.q;

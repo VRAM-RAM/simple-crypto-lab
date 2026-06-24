@@ -1,16 +1,15 @@
 
-use rand::RngCore;
-use rand::rngs::OsRng;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;          
 #[cfg(feature = "parallel")]
 use rayon::slice::ParallelSliceMut;
+use serde::{Deserialize, Serialize};
 use crate::RingParams;
 use crate::ntt::{NTTprecaculated, inverse_ntt, forward_ntt};
 use bytemuck::checked::cast_slice;
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Polynomial { //The polynomial struct, one of the bricks of the project.
     pub coeffs: Box<[u64]>,    
 }
@@ -38,14 +37,6 @@ impl<'a> ToPoly for &'a [u8] {
 impl Polynomial {
     pub fn new(coeffs: Vec<u64>) -> Self { //Creates, from existing coefficients, a Polynomial.
         Self { coeffs: coeffs.into_boxed_slice() }
-    }
-
-    pub fn random(n: usize) -> Self {
-        let mut coeffs = vec![0u64; n];
-        for c in coeffs.iter_mut() {
-        *c = OsRng.next_u64() & 1;
-        }
-        Polynomial::new(coeffs)
     }
 
     pub fn zeros(n: usize) -> Self { //Creates an empty Polynomial.

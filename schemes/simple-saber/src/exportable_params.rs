@@ -2,10 +2,11 @@
 When encapsulating a key, it is useful that the peer knows the used parameters.
 */
 
+use serde::{Deserialize, Serialize};
 use simple_ring::{RingParams};
 use crate::Saber;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SaberExportated {
     pub params: RingParams,
     pub eta: usize,
