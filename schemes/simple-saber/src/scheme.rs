@@ -3,6 +3,7 @@ use simple_ring::{
     Polynomial, RingParams, generate_cbd_sample,
     generate_small_sample, generate_then_shake,
 };
+use crate::types::{SaberKeypair, SaberPublicKey};
 
 /*
 This file provides the core for the simple implementation of SABER scheme in Rust, using primitives given
@@ -10,20 +11,6 @@ in simple-ring. SABER is based on LWR (Learning With Roundness) problem. For mor
 please read '/docs/pdf/simple-saber.pdf. (upcoming)
 */
 
-pub type SaberPublicKey = (Polynomial, [u8; 32]); //The public key stores the key B which is a polynomial, and the Seed for generating the key A.
-pub type SaberSecretKey = Polynomial; //The secret key S
-
-#[derive(Debug, Clone)]
-pub struct SaberKeypair { //The Keypair, that stores the two keys (more simple to manipulate)
-    pub public_key: SaberPublicKey,
-    pub secret_key: SaberSecretKey,
-}
-
-impl SaberKeypair {
-    pub fn new(b: Polynomial, seed: [u8; 32], s: Polynomial) -> Self {
-        Self { public_key: (b, seed), secret_key: s }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct SaberCiphertext {
