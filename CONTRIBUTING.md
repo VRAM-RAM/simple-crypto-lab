@@ -1,6 +1,6 @@
 <!--
 SPDX-FileCopyrightText: 2026 Olruix and simple-crypto-lab contributors
-SPDX-License-Identifier: MIT or Apache-2.0
+SPDX-License-Identifier: CECILL-B or Apache-2.0
 -->
 
 # Contributing to `simple-crypto-lab`
@@ -16,16 +16,11 @@ documentation, proposing a new scheme... , your help is appreciated.
 - [Development Environment Setup](#development-environment-setup)
   - [Install Rust](#install-rust)
   - [Clone the Repository](#clone-the-repository)
-  - [Run Kibi](#run-kibi)
 - [Adding tests](#adding-tests)
   - [For new features](#for-new-features)
   - [For bug fixes](#for-bug-fixes)
 - [Verifying Your Changes](#verifying-your-changes)
   - [Run Tests](#run-tests)
-  - [Format Code](#format-code)
-  - [Run Linters (Nightly)](#run-linters-nightly)
-  - [Count Lines of Code](#count-lines-of-code)
-  - [Optional: Fuzz Testing](#optional-fuzz-testing)
 - [Dependency Policy](#dependency-policy)
 - [Submitting a Pull Request](#submitting-a-pull-request)
 - [License](#license)
@@ -72,14 +67,6 @@ If your change introduces a new feature, please ensure it is appropriately teste
 
 - Functions can typically be tested using **unit testing** within the source
   file (see [documentation](https://doc.rust-lang.org/book/ch11-03-test-organization.html#unit-tests))
-- CLI changes can be tested using **integration tests**  (see
-  [documentation](https://doc.rust-lang.org/book/ch11-03-test-organization.html#integration-tests)).
-  Integration tests are located within the [`tests/`](tests/) directory.
-- **Optional: fuzz testing** can also be used to find security and stability
-  issues by automatically providing pseudo-random data as input to high-level
-  functions (see [documentation](https://rust-fuzz.github.io/book/)). Fuzz tests
-  for Kibi are located within the [`fuzz/`](fuzz/) directory. Refer to the
-  [_Fuzz Testing_ section](#optional-fuzz-testing) to run the fuzz tests.
 
 ### For bug fixes
 
@@ -98,54 +85,14 @@ Before submitting a Pull Request, please run the following checks.
 Ensure all unit tests pass.
 
 ```bash
-cargo test
-```
-
-### Format Code
-
-We use [`rustfmt`](https://github.com/rust-lang/rustfmt) with nightly features
-to keep the codebase clean and compact.
-
-```bash
-cargo +nightly fmt
-```
-
-### Run Linters (Nightly)
-
-We use [`clippy`](https://github.com/rust-lang/rust-clippy) to catch common
-mistakes and enforce idiomatic Rust.
-
-```bash
-cargo +nightly clippy
-```
-
-### Count Lines of Code
-
-Ensure you are within the limits.
-
-```bash
-cargo xtask count-loc
-```
-
-### Optional: Fuzz Testing
-
-If you are changing the logic of configuration parsing, you may want to run the
-fuzz tests. This is not mandatory for every contribution but is appreciated for
-complex changes to configuration parsing.
-
-```bash
-# Requires cargo-fuzz
-cargo +nightly install cargo-fuzz
-
-MAX_TOTAL_TIME=300  # How long to run the test, in seconds
-CARGO_PROFILE_RELEASE_LTO=false cargo +nightly fuzz run fuzz_config_load -- -max_total_time="$MAX_TOTAL_TIME"
+cargo test -- --nocapture
 ```
 
 ## Dependency Policy
 
 Kibi aims to have minimal dependencies.
 
-- **Production Dependencies:** Do **not** add new dependencies to Kibi without
+- **Production Dependencies:** Do **not** add new dependencies to `simple-crypto-lab` without
 explicitly discussing it in an issue first. Most features should be implemented
 using the Rust standard library.
 - **Dev Dependencies:** Adding dependencies for testing or development tools
@@ -166,12 +113,10 @@ Changes to code for Kibi are made through Pull Requests on GitHub.
 2. **Commits:** Similarly, we do not enforce a convention for commit messages,
    but please ensure they are descriptive enough.
 3. **Push & Open PR:** Push your branch to GitHub and open a Pull Request.
-4. **Description:** Fill out the PR description clearly. If you had to refactor
-   code to stay under the 1024-line limit, please mention what was changed to
-   make room.
+4. **Description:** Fill out the PR description clearly. 
 5. **Checks:** After you submit the pull request, continuous integration checks
-   will be run using GitHub Actions to enforce that the commit conforms to Kibi's
-   quality guidelines (tests, formatting, etc.). Please ensure all checks pass,
+   will be run using GitHub Actions to enforce that the commit conforms to `simple-crypto-lab`'s
+   quality guidelines (tests, simplicity, etc.). Please ensure all checks pass,
    fixing surfaced issues as needed.
 
 ## License
@@ -179,6 +124,6 @@ Changes to code for Kibi are made through Pull Requests on GitHub.
 Any contribution submitted for inclusion in Kibi by you shall be dual licensed under:
 
 - [Apache License, Version 2.0](LICENSE-APACHE)
-- [MIT License](LICENSE-MIT)
+- [CECILL-B License](LICENSE-CECILL-B-EN)
 
 without any additional terms or conditions.
