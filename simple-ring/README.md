@@ -40,7 +40,6 @@ To run the tests, or modify the code, you can git clone the repo, and then run t
 ```bash
 cargo test --release -- --nocapture
 ```
-## Repository
 
 ## Repository
 
