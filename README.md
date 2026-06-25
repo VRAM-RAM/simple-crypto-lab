@@ -22,36 +22,45 @@ For production use, consider audited library, like :
 + [OpenFHE](https://openfhe.org/)
 + [liboqs](https://github.com/open-quantum-safe/liboqs)
 
-If you need a Rust implementation, please see [fhe.rs](https://github.com/tlepoint/fhe.rs),  but it isn't audited.
+If you need a Rust implementation, please see [fhe.rs](https://github.com/tlepoint/fhe.rs) or [RustCrypto](https://github.com/rustcrypto),  but it isn't audited.
 
 ## Workspace structure
 
 ```bash
 .
+├── Cargo.lock
 ├── Cargo.toml
-├── docs #The documentation
-│   ├── simple-bfv.pdf
-│   ├── simple-bfv.typ
-│   ├── simple-ring.pdf
-│   └── simple-ring.typ
-├── LICENSE-APACHE #Licenses
-├── LICENSE-MIT
-├── README.md
+├── docs 
+│   ├── pdf
+│   │   ├── simple-bfv.pdf
+│   │   └── simple-ring.pdf 
+│   └── typst
+│       ├── simple-bfv.typ
+│       └── simple-ring.typ
 ├── schemes
-│   ├── README.md #Local README for schemes
-│   └── simple-bfv #BFV implementation (simple-bfv crate)
+│   ├── simple-bfv #simple and educative implementation of BFV
+│   │   ├── Cargo.toml
+│   │   └── src
+│   │       ├── config.rs
+│   │       ├── find_parameters.rs
+│   │       ├── lib.rs
+│   │       ├── plaintext.rs
+│   │       └── scheme.rs
+│   └── simple-saber #simple and educative implementation of SABER KEM
 │       ├── Cargo.toml
-│       ├── README.md
 │       └── src
 │           ├── config.rs
-│           ├── find_parameters.rs
+│           ├── encapsulation.rs
+│           ├── error.rs
+│           ├── exportable_params.rs
 │           ├── lib.rs
-│           ├── plaintext.rs
-│           └── scheme.rs
-└── simple-ring #simple-ring crate
+│           ├── scheme.rs
+│           └── types.rs
+└── simple-ring #Primitives' crate
     ├── Cargo.toml
-    ├── README.md
     └── src
+        ├── bitwriting.rs
+        ├── encoding.rs
         ├── lib.rs
         ├── modular.rs
         ├── ntt.rs
@@ -59,6 +68,8 @@ If you need a Rust implementation, please see [fhe.rs](https://github.com/tlepoi
         ├── ring.rs
         └── sampling.rs
 ```
+> Saber doc is not yet created but will be !
+
 
 ## Quick Start
 
@@ -81,6 +92,10 @@ cargo test --workspace --release
 # Run with parallel NTT & parallel polynomial code (requires rayon, and it's experimental) :
 
 cargo build --workspace --release --features parallel
+
+# Run tests with output :
+
+cargo test -- --nocapture
 ```
 
 
@@ -99,7 +114,7 @@ cargo doc --workspace --open
 
 # Crates full documentation : 
 
-cd docs
+cd docs/typst
 typst compile simple-ring.typ
 typst compile simple-bfv.typ
 ```
@@ -111,6 +126,7 @@ typst compile simple-bfv.typ
 + BFV Scheme : Key generation, encryption, decryption, and homomorphic operations
 + Noise Management : How noise grows and why it limits computation depth
 + Coefficients sampling
++ LWR & Saber scheme. Not the real one ( real saber doesn't use NTT, this one yes for simplicity and compatibility with `simple-ring` )
 
 ### Features 
 

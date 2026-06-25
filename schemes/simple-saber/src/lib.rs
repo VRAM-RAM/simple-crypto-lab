@@ -36,7 +36,7 @@ fn test_encrypt_decrypt_roundtrip() {
 #[test]
 fn test_encapdecap() {
     use crate::encapsulation::SaberDecapsulate;
-    let saber = Saber::light();
+    let saber = Saber::fire();
     let kp = saber.keygen();
     let (key, serialized_enc) = match saber.encapsulate(&kp.public_key) {
         Ok((key, serialized)) => (key, serialized),

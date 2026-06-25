@@ -5,7 +5,7 @@ documentation = "https://docs.rs/simple-ring"
 keywords = ["cryptography", "ntt", "polynomial", "ring", "educational"]
 categories = ["cryptography", "mathematics"]
 edition.workspace = true
-version.workspace = true
+version = "0.2.0"
 license.workspace = true
 authors.workspace = true
 

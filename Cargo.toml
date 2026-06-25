@@ -9,12 +9,11 @@ members = [
 [workspace.dependencies]
 rand = "0.8.0"
 rayon = "1.11.0"
-simple-ring = "0.1.0"
+simple-ring = "0.2.0"
 
 [workspace.package]
 edition = "2024"
-license = "MIT OR Apache-2.0"
-version = "0.1.0"
+license = "CECILL-B OR Apache-2.0"
 authors = ["Olruix (VRAM-RAM)"]
 repository = "https://github.com/VRAM-RAM/simple-crypto-lab"
 
