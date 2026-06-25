@@ -13,29 +13,32 @@ To use it, simply do :
 ```bash
 cargo add simple-saber
 ```
-Then, in your code, you can use it as you want :
+Then, in your code, you can use it as you want, e.g for encapsulating and decapsulating :
 ```rust
-use simple_saber::{BFV, BFVPlaintext};
+use simple_saber::{SaberDecapsulate, Saber};
 
 fn main() {
-    let bfv = BFV::for_test();
-    let a = bfv.generate_public_a();
-    let s = bfv.generate_secret_key();
-    let b = bfv.generate_public_b(&a, &s);
-    let plaintext = BFVPlaintext::new("Bonjour, voici bfv", &bfv);
-    let ciphertext = bfv.encrypt(&plaintext, &a, &b);
-    println!("ciphertext is {:?}", ciphertext);
-    let decrypted = bfv.decrypt(&ciphertext, &s);
-    println!("Decrypted is {}", decrypted);
+    let saber = Saber::fire();
+    let kp = saber.keygen();
+    let (key, serialized_enc) = match saber.encapsulate(&kp.public_key) {
+        Ok((key, serialized)) => (key, serialized),
+        Err(e) => panic!("Error while encapsulating : {:?}", e),
+    };
+    let recovered = match serialized_enc.decapsulate(&kp) {
+        Ok(key) => key,
+        Err(e) => { panic!("Error while decapsulating : {:?}", e) }
+    };
+    assert_eq!(key, recovered, "Error : the encapsulated key and the decapsulated key doesn't match !");
+    println!("Shared key is {:?} == {:?}", key, recovered);
 }
 ```
 
 ## Parameters
 
 The real `saber` parameters are :
-<a href="https://www.researchgate.net/figure/Parameters-of-Saber-with-security-and-failure-probability-DKRV18_tbl2_378951552"><img src="https://www.researchgate.net/publication/378951552/figure/tbl2/AS:11431281853463352@1768309313394/Parameters-of-Saber-with-security-and-failure-probability-DKRV18.png" alt="Parameters of Saber with security and failure probability [DKRV18]"/></a>
+<img src="https://www.researchgate.net/publication/378951552/figure/tbl2/AS:11431281853463352@1768309313394/Parameters-of-Saber-with-security-and-failure-probability-DKRV18.png" alt="Parameters of Saber with security and failure probability [DKRV18]"/></a>
 
-In this implementation, saber scheme and paramters have been simplified.
+In this implementation, saber scheme and parameters have been simplified.
 
 ## Tests & modifications
 

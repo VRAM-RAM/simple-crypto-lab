@@ -4,10 +4,15 @@ mod encapsulation;
 mod error;
 mod types;
 mod exportable_params;
+
 pub use config::{Saber};
 pub use scheme::{Key, SaberCiphertext};
 pub use crate::types::{SaberKeypair, SaberPublicKey, SaberSecretKey};
 pub use crate::encapsulation::SaberEncapsulated;
+pub use crate::encapsulation::ToSaberEncapsulated;
+pub use crate::encapsulation::SaberDecapsulate;
+
+
 /*
 This crate provides a simplified implementation of SABER KEM scheme. It was rebuilt to simplify implementation, and to use `simple-ring`. 
 For example :
@@ -35,7 +40,6 @@ fn test_encrypt_decrypt_roundtrip() {
 #[cfg(test)]
 #[test]
 fn test_encapdecap() {
-    use crate::encapsulation::SaberDecapsulate;
     let saber = Saber::fire();
     let kp = saber.keygen();
     let (key, serialized_enc) = match saber.encapsulate(&kp.public_key) {

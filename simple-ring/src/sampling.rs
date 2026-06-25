@@ -32,7 +32,7 @@ impl Polynomial {
     pub fn random_binary(n: usize) -> Self {
         let mut coeffs = vec![0u64; n];
         for c in coeffs.iter_mut() {
-        *c = OsRng.next_u64() & 1;
+        *c = OsRng.gen_range(0..=1);
         }
         Polynomial::new(coeffs)
     }

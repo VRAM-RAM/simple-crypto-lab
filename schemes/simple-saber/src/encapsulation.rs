@@ -44,7 +44,8 @@ impl Saber {
             Ok(v) => v,
             Err(e) => return Err(SaberError::SerializationError(e))
         };
-        Ok((key.as_bytes().to_vec(),  bytes_enc))
+        let shared_key = blake3::hash(key.as_bytes()).as_bytes().to_vec();
+        Ok((shared_key,  bytes_enc))
     }
 }
 
@@ -90,7 +91,8 @@ impl SaberDecapsulate for SaberEncapsulated {
         let mac = blake3::hash(&mac_plain).as_bytes().to_vec().into_boxed_slice();
         let result = mac.ct_eq(&self.mac);
         if result.into() {
-            Ok(key)
+            let shared_key = blake3::hash(&key).as_bytes().to_vec();
+            Ok(shared_key)
         } else {
             Err(SaberError::InvalidMac)
         }
@@ -108,7 +110,8 @@ impl SaberDecapsulate for Vec<u8> {
         let mac = blake3::hash(&mac_plain).as_bytes().to_vec().into_boxed_slice();
         let result = mac.ct_eq(&encap.mac);
         if result.into() {
-            Ok(key)
+            let shared_key = blake3::hash(&key).as_bytes().to_vec();
+            Ok(shared_key)
         } else {
             Err(SaberError::InvalidMac)
         }
