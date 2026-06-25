@@ -2,6 +2,13 @@
 use crate::{Polynomial, RingParams};
 use rand::{Rng, RngCore, rngs::OsRng};
 use std::ops::Deref;
+use shake::{Shake128};
+use shake::digest::{Update, ExtendableOutput, XofReader};
+
+pub enum SeedType {
+    NotGiven,
+    Given([u8; 32])
+}
 
 #[derive(Clone, Debug)]
 pub struct Sample(pub Vec<i32>);
@@ -21,7 +28,15 @@ impl Sample {
     }
 }
 
-
+impl Polynomial {
+    pub fn random_binary(n: usize) -> Self {
+        let mut coeffs = vec![0u64; n];
+        for c in coeffs.iter_mut() {
+        *c = OsRng.gen_range(0..=1);
+        }
+        Polynomial::new(coeffs)
+    }
+}
 
 #[inline]
 pub fn generate_cbd_sample(n: usize, eta: usize) -> Sample { //Inter function to create Centered Binomial Distribution
@@ -95,3 +110,41 @@ pub fn generate_uniform_polynomial(params: &RingParams) -> Polynomial { //Intern
 
     Polynomial { coeffs: coeffs.into_boxed_slice() }
 }
+
+#[inline]
+pub fn generate_then_shake(params: &RingParams, seed_type: SeedType) -> (Sample, [u8; 32]) {
+    let mut rng = OsRng;
+
+    match seed_type {
+        SeedType::Given(seed) => {
+            let buf = shake_128(seed, params.n);
+            let coeffs: Vec<i32> = buf
+                .into_iter()
+                .map(|b| (b as i32) - 128) 
+                .collect(); 
+            
+            return (Sample(coeffs), seed)
+        }
+        SeedType::NotGiven => {
+            let mut seed = [0u8; 32];
+            rng.fill_bytes(&mut seed);
+            let buf = shake_128(seed, params.n);
+            let coeffs: Vec<i32> = buf
+                .into_iter()
+                .map(|b| (b as i32) - 128) 
+                .collect(); 
+            
+            return (Sample(coeffs), seed)
+        }
+    }
+}
+
+pub fn shake_128(seed: [u8; 32], n: usize) -> Vec<u8> {
+    let mut hasher = Shake128::default();
+    hasher.update(&seed);
+    let mut reader = hasher.finalize_xof();
+
+    let mut buf = vec![0u8; n];
+    reader.read(&mut buf);
+    buf
+} 

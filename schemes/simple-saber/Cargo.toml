@@ -1,0 +1,21 @@
+[package]
+name = "simple-saber"
+description = "Educational implementation of Saber KEM"  
+edition.workspace = true
+version = "0.2.0"
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords = ["kem", "saber", "pqc", "cryptography", "educational"]
+categories = ["cryptography"]
+documentation = "https://docs.rs/simple-saber" 
+
+
+[dependencies]
+blake3 = "1.8.5"
+rand.workspace = true
+rayon = { workspace = true, optional = true }
+subtle = "2.6"
+simple-ring.workspace = true
+serde = "1.0.228"
+postcard = { version = "1", features = ["alloc"] }

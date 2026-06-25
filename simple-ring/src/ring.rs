@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
 
 
-#[derive(Clone)]
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct RingParams {
     pub n: usize,
     pub q: u64,

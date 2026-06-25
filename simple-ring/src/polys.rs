@@ -3,17 +3,36 @@
 use rayon::prelude::*;          
 #[cfg(feature = "parallel")]
 use rayon::slice::ParallelSliceMut;
+use serde::{Deserialize, Serialize};
 use crate::RingParams;
 use crate::ntt::{NTTprecaculated, inverse_ntt, forward_ntt};
+use bytemuck::checked::cast_slice;
 
 
-
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Polynomial { //The polynomial struct, one of the bricks of the project.
     pub coeffs: Box<[u64]>,    
 }
 
+#[allow(dead_code)]
+pub trait ToPoly {
+    fn to_poly(&self) -> Polynomial;
+}
+
+impl<'a> ToPoly for &'a [u8] {  
+    fn to_poly(&self) -> Polynomial {
+        let coeffs: Vec<u64> = self
+            .chunks(8)
+            .map(|chunk| {
+                let mut bytes = [0u8; 8];
+                bytes[..chunk.len()].copy_from_slice(chunk);
+
+                u64::from_le_bytes(bytes)
+            })
+            .collect();
+        Polynomial::new(coeffs)
+    }
+}
 
 impl Polynomial {
     pub fn new(coeffs: Vec<u64>) -> Self { //Creates, from existing coefficients, a Polynomial.
@@ -22,6 +41,10 @@ impl Polynomial {
 
     pub fn zeros(n: usize) -> Self { //Creates an empty Polynomial.
         Self { coeffs: vec![0u64; n].into_boxed_slice() }
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        cast_slice(&self.coeffs)
     }
 
     //Code for calling single or parallel polynomial code
@@ -178,14 +201,18 @@ impl Polynomial {
         let a = forward_ntt(params, self, ntt_tables);
         let b = forward_ntt(params, polynomial, ntt_tables);
 
-        let mut c_ntt = Polynomial::zeros(params.n);
-
-        for i in 0..params.n {
-            c_ntt.coeffs[i] = ((a.coeffs[i] as u128 * b.coeffs[i] as u128) % params.q as u128) as u64;
-        }
+        let c_ntt = a.pointwise_mul(params, &b);
 
         inverse_ntt(params, &c_ntt, ntt_tables)
         
     }
 
+    #[inline]
+    pub fn pointwise_mul(&self, params: &RingParams, polynomial: &Polynomial) -> Polynomial { //Function that computes the pointwise mul of two Polynomials (a ◦ b)
+        let mut result = vec![0u64; params.n];
+        for i in 0..params.n {
+            result[i] = ((self.coeffs[i] as u128 * polynomial.coeffs[i] as u128) % params.q as u128) as u64;
+        }
+        Polynomial::new(result)
+    }
 }

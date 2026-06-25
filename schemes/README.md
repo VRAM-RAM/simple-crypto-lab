@@ -7,6 +7,7 @@ Here, you can find the schemes implemented thanks to simple-ring (and so LWE pro
 ## Implemented schemes :
 
 - BFV (Brakerski/ Fan-Vercauteren) FHE
+- SABER inspired KEM
 
 ## Schemes to be implemented (if I got the time) :
 

@@ -2,7 +2,7 @@
 name = "simple-bfv"
 description = "Educational implementation of BFV FHE scheme"  
 edition.workspace = true
-version.workspace = true
+version = "0.1.1"
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
