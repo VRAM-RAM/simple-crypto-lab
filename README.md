@@ -2,6 +2,7 @@
 \
 🔵 **Human-written**
 \
+\
 ![simple-crypto-lab](https://img.shields.io/badge/simple_crypto_lab-rust-orange)
 ![Version](https://img.shields.io/github/v/release/VRAM-RAM/simple-crypto-lab)
 ![License](https://img.shields.io/github/license/VRAM-RAM/simple-crypto-lab)
