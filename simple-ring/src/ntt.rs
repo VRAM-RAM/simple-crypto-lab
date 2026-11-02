@@ -5,15 +5,13 @@ use rayon::slice::ParallelSliceMut;
 
 use crate::RingParams;
 use crate::modular::mod_pow;
-use crate::polys::Polynomial;
+use crate::poly::Polynomial;
 
 #[derive(Clone)]
 pub struct NTTprecaculated {
     pub twiddles: Box<[u128]>,
     pub twiddles_inv: Box<[u128]>,
 }
-
-
 
 pub fn precalculate(params: &RingParams) -> NTTprecaculated {
     let n = params.n;

@@ -1,13 +1,14 @@
 pub mod ring;
 pub mod ntt;
-pub mod polys;
+pub mod poly;
 pub mod modular;
 pub mod sampling;
 pub mod encoding;
 pub mod bitwriting;
+pub mod traits;
 pub use ring::RingParams as RingParams;
-pub use polys::Polynomial as Polynomial;
-pub use polys::ToPoly;
+pub use poly::Polynomial as Polynomial;
+pub use poly::ToPoly;
 pub use modular::{find_valid_omega, is_q_valid, mod_pow, is_prime};
 pub use sampling::{generate_small_sample, generate_cbd_sample, generate_uniform_polynomial, generate_then_shake, shake_128, Sample, SeedType};
 pub use ntt::{forward_ntt, inverse_ntt, precalculate};
