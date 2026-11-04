@@ -1,20 +1,21 @@
 use serde::{Deserialize, Serialize};
-use simple_ring::Polynomial;
 use std::ops::Deref;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SaberPublicKey { 
-    pub b: Polynomial, 
-    pub a_seed: [u8; 32] 
-} //The public key stores the key B which is a polynomial, and the Seed for generating the key A.
-
+use crate::Poly64;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SaberSecretKey(Polynomial); //The secret key S
+/// The public key, that stores the key B which is a polynomial, and the Seed for generating the key A.
+pub struct SaberPublicKey {
+    pub b: Poly64,
+    pub a_seed: [u8; 32],
+}
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// The scecret key
+pub struct SaberSecretKey(Poly64);
 
 impl Deref for SaberSecretKey {
-    type Target = Polynomial;
+    type Target = Poly64;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -22,13 +23,17 @@ impl Deref for SaberSecretKey {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SaberKeypair { //The Keypair, that stores the two keys (more simple to manipulate)
+/// The Keypair, that stores the two keys (more simple to manipulate)
+pub struct SaberKeypair {
     pub public_key: SaberPublicKey,
     pub secret_key: SaberSecretKey,
 }
 
 impl SaberKeypair {
-    pub fn new(b: Polynomial, seed: [u8; 32], s: Polynomial) -> Self {
-        Self { public_key: SaberPublicKey { b, a_seed: seed }, secret_key: SaberSecretKey(s) }
+    pub fn new(b: Poly64, seed: [u8; 32], s: Poly64) -> Self {
+        Self {
+            public_key: SaberPublicKey { b, a_seed: seed },
+            secret_key: SaberSecretKey(s),
+        }
     }
 }
