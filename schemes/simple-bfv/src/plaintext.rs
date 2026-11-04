@@ -1,17 +1,16 @@
 //Code for plaintext
-use simple_ring::Polynomial;
-use crate::BFV;
+use crate::{BFV, Poly64};
 
 #[derive(Clone)]
 pub struct BFVPlaintext {
-    pub plain: Polynomial,
+    pub plain: Poly64,
     pub len: usize,
 }
 
 impl BFVPlaintext {
     pub fn empty(bfv: &BFV) -> Self { //Function that, given the cipher (BFV) creates and empty Plaintext ( Plaintext = [0, 0, 0, 0, ... , 0] )
         Self { 
-            plain: Polynomial::zeros(bfv.params.n),
+            plain: Poly64::zeros(bfv.params.n),
             len: 0, //We define the len of datas to 0, because the plaintext is empty.
         }
     }
@@ -20,12 +19,12 @@ impl BFVPlaintext {
 
         let encoded: Vec<u64> = to_push.as_bytes().iter().map(|&b| b as u64).collect(); //First, we encode the datas into a Vec of u64s
 
-        let remaining = self.plain.coeffs.len() - self.len; //We calculate the remaining coeffs we can write
+        let remaining = self.plain.len() - self.len; //We calculate the remaining coeffs we can write
 
         let len_to_write = encoded.len().min(remaining); 
 
         for i in 0..len_to_write { //We write the empty coefficients with pushed ones
-            self.plain.coeffs[self.len + i] = encoded[i];
+            self.plain[self.len + i] = encoded[i];
         }
 
         self.len += len_to_write; //We finally update the len of the plaintext
@@ -46,17 +45,17 @@ impl BFVPlaintext {
         }
 
         Self {
-            plain: Polynomial::new(coeffs), //We finally create the Plaintext
+            plain: Poly64::new_from_coeffs(coeffs), //We finally create the Plaintext
             len: len_to_write, 
         }
     }
 
     pub fn new_from_coeffs(coeffs: Vec<u64>, bfv: &BFV) -> Self { //Function to create a plaintext, but directly from a Vec of u64s, not from a String
-        Self { plain: Polynomial::new(coeffs), len: bfv.params.n }
+        Self { plain: Poly64::new_from_coeffs(coeffs), len: bfv.params.n }
     }
 
     pub fn decode(&self) -> String { //Method to decode a plaintext
-        let vec = self.plain.coeffs.to_vec();
+        let vec = self.plain.to_vec();
         let vec: Vec<u8> = vec.iter().map(|&b| b as u8).collect();
         str::from_utf8(&vec).unwrap().to_string()
     }   

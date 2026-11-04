@@ -1,3 +1,4 @@
+use crate::traits::RingCompatible;
 //Code for sampling of polynomials, and generation of coefficients
 use crate::{Polynomial, RingParams};
 use rand::{Rng, RngCore, rngs::OsRng};
@@ -22,31 +23,41 @@ impl Deref for Sample {
 }
 
 impl Sample {
-    pub fn to_poly(self, q:u64) -> Polynomial {
-        let coeffs = self.iter().map(|v| (*v as i128).rem_euclid(q as i128) as u64).collect();
-        Polynomial::new(coeffs)
+    pub fn to_poly<T: Clone + Into<i128> + From<i128>>(self, q: T) -> Polynomial<T> {
+        let coeffs = self.iter().map(|v| (*v as i128).rem_euclid(q.clone().into()).into()).collect();
+        Polynomial::new_from_coeffs(coeffs)
     }
 }
 
-impl Polynomial {
+impl Polynomial<u8> {
     pub fn random_binary(n: usize) -> Self {
-        let mut coeffs = vec![0u64; n];
+        let mut coeffs = vec![0u8; n];
+
         for c in coeffs.iter_mut() {
         *c = OsRng.gen_range(0..=1);
         }
-        Polynomial::new(coeffs)
+
+        Polynomial::new_from_coeffs(coeffs)
     }
 }
 
 #[inline]
-pub fn generate_cbd_sample(n: usize, eta: usize) -> Sample { //Inter function to create Centered Binomial Distribution
-
-    /*
-    This is how it works (on the left, explanations and on the right, example) :
-    For each coefficient, we randomly choose bits for two parts, a and b.           | a = [0, 1, 1, 1]           b = [1, 0, 1, 1]    
-    Then, we sum this coefficients for each part.                                   | a = 0 + 1 + 1 + 1 = 3      b = 1 + 0 + 1 + 1 = 3
-    Finally, the value of our coefficient is equal to a - b                         | coeff = a - b = 3 - 3 = 0
-    */
+/// Returns a Centered Binomial Distribution sample
+/// 
+/// This is how it works (on the left, explanations and on the right, example) :
+/// 
+/// For each coefficient, we randomly choose bits for two parts, a and b.           
+/// 
+/// `a = [0, 1, 1, 1]`           `b = [1, 0, 1, 1]`    
+/// 
+/// Then, we sum this coefficients for each part.                                   
+/// 
+/// `a = 0 + 1 + 1 + 1 = 3`      `b = 1 + 0 + 1 + 1 = 3`
+/// 
+/// Finally, the value of our coefficient is equal to a - b                         
+/// 
+/// `coeff = a - b = 3 - 3 = 0`
+pub fn generate_cbd_sample(n: usize, eta: usize) -> Sample {
 
     let mut coeffs = vec![0i32; n]; // So first we create an empty vector which will contain the coefficients.
 
@@ -86,7 +97,8 @@ pub fn generate_cbd_sample(n: usize, eta: usize) -> Sample { //Inter function to
 
 
 #[inline]
-pub fn generate_small_sample(params: &RingParams) -> Sample { //Intern function that generates the small-coeffs sample
+/// Generates the small-coeffs sample (`[-1; 1]`)
+pub fn generate_small_sample(params: &RingParams) -> Sample {
     let mut rng = OsRng; 
     let mut coeffs: Vec<i32> = Vec::with_capacity(params.n);
     
@@ -99,19 +111,21 @@ pub fn generate_small_sample(params: &RingParams) -> Sample { //Intern function 
 }
 
 #[inline]
-pub fn generate_uniform_polynomial(params: &RingParams) -> Polynomial { //Intern function for generating a polynomial with uniform distribution, in the ring
+// Generates a polynomial with uniform distribution, in the ring
+pub fn generate_uniform_polynomial<T: RingCompatible + Clone>(params: &RingParams) -> Polynomial<T> {
     let mut rng = OsRng;
     let mut coeffs = Vec::with_capacity(params.n);
 
     for _ in 0..params.n {
-        let uniform: u64 = rng.gen_range(0..=params.q - 1); // We generate values that are in the ring 
+        let uniform: T = T::from_u64(rng.gen_range(0u64..=params.q - 1u64)); // We generate values that are in the ring 
         coeffs.push(uniform);
     }
 
-    Polynomial { coeffs: coeffs.into_boxed_slice() }
+    Polynomial::new_from_coeffs(coeffs)
 }
 
 #[inline]
+/// Given a [`SeedType`] (w/ seed or without seed), returns a [`Sample`] (the hash) and its `seed`
 pub fn generate_then_shake(params: &RingParams, seed_type: SeedType) -> (Sample, [u8; 32]) {
     let mut rng = OsRng;
 
@@ -125,6 +139,7 @@ pub fn generate_then_shake(params: &RingParams, seed_type: SeedType) -> (Sample,
             
             return (Sample(coeffs), seed)
         }
+
         SeedType::NotGiven => {
             let mut seed = [0u8; 32];
             rng.fill_bytes(&mut seed);
@@ -139,6 +154,7 @@ pub fn generate_then_shake(params: &RingParams, seed_type: SeedType) -> (Sample,
     }
 }
 
+/// Given a seed and the size of the `hash` you want, generates an hash using `Shake128`.  
 pub fn shake_128(seed: [u8; 32], n: usize) -> Vec<u8> {
     let mut hasher = Shake128::default();
     hasher.update(&seed);

@@ -1,3 +1,8 @@
+//! Defines the [`Polynomial`] structure, and basic methods.
+//! 
+//! Also implements `as_bytes()` from [**bytemuck**](`bytemuck`)
+//! 
+//! In lower modules ([`impls`] and [`ring`]), it defines the operations (sum, sub, mul...) and operations in the rings (ntt mul, ring's sum...)
 
 use bytemuck::Pod;
 use num::Zero;
@@ -6,8 +11,6 @@ use rayon::prelude::*;
 #[cfg(feature = "parallel")]
 use rayon::slice::ParallelSliceMut;
 use serde::{Deserialize, Serialize};
-use crate::RingParams;
-use crate::ntt::{NTTprecaculated, inverse_ntt, forward_ntt};
 use bytemuck::checked::cast_slice;
 
 pub mod impls;
@@ -127,25 +130,22 @@ impl<T : Clone> Polynomial<T> {
         self.coeffs.len()
     }
 
-    #[inline]
-    pub fn mul_ntt(&self, params: &RingParams, ntt_tables: &NTTprecaculated, polynomial: &Polynomial) -> Polynomial { //Function that computes the product of two polynomials by passing them in NTTs.
-        assert_eq!(self.coeffs.len(), polynomial.coeffs.len(), "The length of the two polynomials you're trying to multiply doesn't match ! You may use parameters.n for both of the polynomials");
-        let a = forward_ntt(params, self, ntt_tables);
-        let b = forward_ntt(params, polynomial, ntt_tables);
-
-        let c_ntt = a.pointwise_mul(params, &b);
-
-        inverse_ntt(params, &c_ntt, ntt_tables)
-        
-    }
-
-    #[inline]
-    pub fn pointwise_mul(&self, params: &RingParams, polynomial: &Polynomial) -> Polynomial { //Function that computes the pointwise mul of two Polynomials (a ◦ b)
-        let mut result = vec![0u64; params.n];
-        for i in 0..params.n {
-            result[i] = ((self.coeffs[i] as u128 * polynomial.coeffs[i] as u128) % params.q as u128) as u64;
-        }
-        Polynomial::new(result)
+    /// Converts the [`Polynomial`] into a [`Vec`]
+    /// 
+    /// ### Example
+    /// 
+    /// ```rust
+    /// use simple_ring::Polynomial;
+    /// 
+    /// fn foo() {
+    /// 
+    ///     let poly: Polynomial<u16> = Polynomial::new_from_coeffs(vec![8u16; 13]);
+    /// 
+    ///     let vec: Vec<u16> = poly.to_vec();   
+    /// }
+    /// ```
+    pub fn to_vec(&self) -> Vec<T> {
+        self.coeffs.to_vec()
     }
 }
 

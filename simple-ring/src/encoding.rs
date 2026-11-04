@@ -1,4 +1,4 @@
-use crate::{Polynomial, RingParams, bitwriting::BitWriter};
+use crate::{Polynomial, RingParams, bitwriting::BitWriter, traits::RingCompatible};
 
 fn log2_ceil(q: u64) -> u32 {
     if q <= 1 {
@@ -9,21 +9,21 @@ fn log2_ceil(q: u64) -> u32 {
 }
 
 impl RingParams {
-    pub fn encode_a(&self, seed: &[u8; 32], b: &Polynomial) -> Vec<u8> {
+    pub fn encode_a<T: RingCompatible + Clone>(&self, seed: &[u8; 32], b: &Polynomial<T>) -> Vec<u8> {
         let mut writer = BitWriter::new(1792 + 32);
 
         for &byte in seed {
             writer.write_bits(byte as u64, 8);
         }
 
-        for coeff in b.coeffs.clone() {
-            writer.write_bits(coeff, log2_ceil(self.q) as usize);
+        for coeff in b.to_vec() {
+            writer.write_bits(coeff.to_u64(), log2_ceil(self.q) as usize);
         }
 
         writer.finish()
     }
 
-    pub fn decode_a(&self, msg: &[u8]) -> ([u8; 32], Polynomial) {
+    pub fn decode_a<T: RingCompatible + Clone>(&self, msg: &[u8]) -> ([u8; 32], Polynomial<T>) {
         let mut seed = [0u8; 32];
 
         let mut bit_index = 0;
@@ -45,18 +45,18 @@ impl RingParams {
 
         let mut b = Vec::with_capacity(self.n);
         for _ in 0..self.n {
-            b.push(read_bits(log2_ceil(self.q) as usize));
+            b.push(T::from_u64(read_bits(log2_ceil(self.q) as usize)));
         }
 
-        (seed, Polynomial::new(b))
+        (seed, Polynomial::new_from_coeffs(b))
     }
 
 
-    pub fn encode_b(&self, u: &Polynomial, r: &Vec<u8>) -> Vec<u8> {
+    pub fn encode_b<T: RingCompatible + Clone>(&self, u: &Polynomial<T>, r: &Vec<u8>) -> Vec<u8> {
         let mut writer = BitWriter::new(2048);
 
-        for coeff in u.coeffs.clone() {
-            writer.write_bits(coeff, log2_ceil(self.q) as usize);
+        for coeff in u.to_vec() {
+            writer.write_bits(coeff.to_u64(), log2_ceil(self.q) as usize);
         }
 
         for &bit in r {
@@ -66,7 +66,7 @@ impl RingParams {
         writer.finish()
     }
 
-    pub fn decode_b(&self, msg: &[u8]) -> (Polynomial, Vec<u8>) {
+    pub fn decode_b<T: RingCompatible + Clone>(&self, msg: &[u8]) -> (Polynomial<T>, Vec<u8>) {
         let mut bit_index = 0;
 
         let mut read_bits = |bits: usize| -> u64 {
@@ -82,7 +82,7 @@ impl RingParams {
 
         let mut u = Vec::with_capacity(self.n);
         for _ in 0..self.n {
-            u.push(read_bits(log2_ceil(self.q) as usize));
+            u.push(T::from_u64(read_bits(log2_ceil(self.q) as usize)));
         }
 
         let mut r = Vec::with_capacity(self.n);
@@ -90,6 +90,6 @@ impl RingParams {
             r.push(read_bits(1) as u8);
         }
 
-        (Polynomial::new(u), r)
+        (Polynomial::new_from_coeffs(u), r)
     }
 }

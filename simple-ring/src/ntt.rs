@@ -6,6 +6,8 @@ use rayon::slice::ParallelSliceMut;
 use crate::RingParams;
 use crate::modular::mod_pow;
 use crate::poly::Polynomial;
+#[cfg(not(feature = "parallel"))]
+use crate::traits::RingCompatible;
 
 #[derive(Clone)]
 pub struct NTTprecaculated {
@@ -43,33 +45,33 @@ pub fn precalculate(params: &RingParams) -> NTTprecaculated {
 
 
 #[cfg(not(feature = "parallel"))]
-pub fn forward_ntt(params: &RingParams, polynomial: &Polynomial, ntt_tables: &NTTprecaculated) -> Polynomial {
+pub fn forward_ntt<T: RingCompatible + Clone>(params: &RingParams, polynomial: &Polynomial<T>, ntt_tables: &NTTprecaculated) -> Polynomial<T> {
     forward_ntt_single( params,  polynomial, ntt_tables)
 }
 
 #[cfg(not(feature = "parallel"))]
-pub fn inverse_ntt(params: &RingParams, polynomial: &Polynomial, ntt_tables: &NTTprecaculated) -> Polynomial {
+pub fn inverse_ntt<T: RingCompatible + Clone>(params: &RingParams, polynomial: &Polynomial<T>, ntt_tables: &NTTprecaculated) -> Polynomial<T> {
     inverse_ntt_single( params,  polynomial, ntt_tables)
 }
 
 #[cfg(feature = "parallel")]
-pub fn forward_ntt(params: &RingParams, polynomial: &Polynomial, ntt_tables: &NTTprecaculated) -> Polynomial {
+pub fn forward_ntt<T: RingCompatible + Clone>(params: &RingParams, polynomial: &Polynomial<T>, ntt_tables: &NTTprecaculated) -> Polynomial<T> {
     forward_ntt_multi( params,  polynomial, ntt_tables)
 }
 
 #[cfg(feature = "parallel")]
-pub fn inverse_ntt(params: &RingParams, polynomial: &Polynomial, ntt_tables: &NTTprecaculated) -> Polynomial {
+pub fn inverse_ntt<T: RingCompatible + Clone>(params: &RingParams, polynomial: &Polynomial<T>, ntt_tables: &NTTprecaculated) -> Polynomial<T> {
     inverse_ntt_multi( params,  polynomial, ntt_tables)
 }
 
 
 
-fn forward_ntt_single(
+fn forward_ntt_single<T: RingCompatible + Clone>(
     params: &RingParams,
-    polynomial: &Polynomial,
+    polynomial: &Polynomial<T>,
     ntt_tables: &NTTprecaculated
-) -> Polynomial {
-    let mut coeffs: Vec<u64> = polynomial.coeffs.to_vec();
+) -> Polynomial<T> {
+    let mut coeffs: Vec<T> = polynomial.to_vec();
         
 
     let n = params.n;
@@ -86,16 +88,16 @@ fn forward_ntt_single(
             let j2 = j1 + t - 1;
 
             for j in j1..=j2 {
-                let u = coeffs[j] as u128;
+                let u = coeffs[j].to_u128();
                 let w = ntt_tables.twiddles[m + i]; 
-                let v = ((coeffs[j + t]) as u128 * w) % q;
+                let v = ((coeffs[j + t]).to_u128() * w) % q;
 
                     let mut x = u + v;
                     if x >= q { x -= q; }
-                    coeffs[j] = x as u64;
+                    coeffs[j] = T::from_u128(x);
 
                     let y = if u >= v { u - v } else { u + q - v };
-                    coeffs[j + t] = y as u64;
+                    coeffs[j + t] = T::from_u128(y);
 
             }
         }
@@ -105,17 +107,15 @@ fn forward_ntt_single(
         if m >= n { break; }
     }
 
-    Polynomial {
-        coeffs: coeffs.into_iter().collect::<Vec<_>>().into_boxed_slice(),
-    }
+    Polynomial::new_from_coeffs(coeffs)
 }
 
-fn inverse_ntt_single(
+fn inverse_ntt_single<T: RingCompatible + Clone>(
     params: &RingParams,
-    polynomial: &Polynomial,
+    polynomial: &Polynomial<T>,
     ntt_tables: &NTTprecaculated
-) -> Polynomial {
-    let mut coeffs: Vec<u64> = polynomial.coeffs.to_vec();
+) -> Polynomial<T> {
+    let mut coeffs: Vec<T> = polynomial.to_vec();
 
     let n = params.n;
     let q = params.q as u128;
@@ -131,16 +131,16 @@ fn inverse_ntt_single(
             let j2 = j1 + t - 1;
 
             for j in j1..=j2 {
-                let u = coeffs[j] as u128;
-                let v = coeffs[j + t] as u128;
+                let u = coeffs[j].to_u128();
+                let v = coeffs[j + t].to_u128();
 
                 let sum = u + v;
                 let sum = if sum >= q { sum - q } else { sum };
-                coeffs[j] = sum as u64;                
+                coeffs[j] = T::from_u128(sum);                
 
                 
                 let w = ntt_tables.twiddles_inv[h + i];
-                coeffs[j + t] = (((u + q - v) % q * w) % q) as u64;
+                coeffs[j + t] = T::from_u128(((u + q - v) % q * w) % q);
             }
 
             j1 += 2 * t;
@@ -154,26 +154,23 @@ fn inverse_ntt_single(
     }
 
     let n_inv = mod_pow(n as u128, q - 2, q);
+
     for c in coeffs.iter_mut() {
-        *c = (*c * n_inv as u64) % q as u64;
+        *c = T::from_u128((c.to_u128() * n_inv) % q as u128);
     }
 
-    Polynomial {
-        coeffs: coeffs.into_iter().collect::<Vec<_>>().into_boxed_slice(),
-    }
+    Polynomial::new_from_coeffs(coeffs)
 }
 
 
 #[cfg(feature = "parallel")]
-fn forward_ntt_multi(
+fn forward_ntt_multi<T: RingCompatible + Clone>(
     params: &RingParams,
-    polynomial: &Polynomial,
+    polynomial: &Polynomial<T>,
     ntt_tables: &NTTprecaculated
 ) -> Polynomial {
-    let mut coeffs: Vec<u128> = polynomial.coeffs
-        .iter()
-        .map(|&c| c as u128)
-        .collect();
+    let mut coeffs: Vec<T> = polynomial.to_vec();
+
 
     let n = params.n;
     let q = params.q as u128;
@@ -193,12 +190,12 @@ fn forward_ntt_multi(
         for j in 0..t {
             let u = chunk[j];
             let w = ntt_tables.twiddles[m + i];
-            let v = ((chunk[j + t]) * w) % params.q as u128;
+            let v = ((chunk[j + t].to_u128()) * w) % params.q as u128;
             let sum = u + v;
            
-            chunk[j] = if sum >= q { sum - q } else { sum };
+            chunk[j] = if sum >= q { T::from_u128(sum - q) } else { T::from_u128(sum) };
 
-            chunk[j + t] = if u >= v { u - v } else { u + q - v };
+            chunk[j + t] = if u >= v { T::from_u128(u - v) } else { T::from_u128(u + q - v) };
         }
     });
    
@@ -208,21 +205,16 @@ fn forward_ntt_multi(
         if m >= n { break; }
     }
 
-    Polynomial {
-        coeffs: coeffs.into_iter().map(|c| c as u64).collect::<Vec<_>>().into_boxed_slice(),
-    }
+    Polynomial::new_from_coeffs(coeffs)
 }
 
 #[cfg(feature = "parallel")]
-fn inverse_ntt_multi(
+fn inverse_ntt_multi<T: RingCompatible + Clone>(
     params: &RingParams,
     polynomial: &Polynomial,
     ntt_tables: &NTTprecaculated
 ) -> Polynomial {
-    let mut coeffs: Vec<u128> = polynomial.coeffs
-        .iter()
-        .map(|&c| c as u128)
-        .collect();
+    let mut coeffs: Vec<u128> = polynomial.to_vec();
 
     let n = params.n;
     let q = params.q as u128;
@@ -240,11 +232,11 @@ fn inverse_ntt_multi(
         let w = ntt_tables.twiddles_inv[h + i];
 
         for j in 0..t {
-            let u = chunk[j];
-            let v = chunk[j + t];
+            let u = chunk[j].to_u128();
+            let v = chunk[j + t].to_u128();
 
             let sum = u + v;
-            chunk[j] = if sum >= q { sum - q } else { sum };
+            chunk[j] = if sum >= q { T::from_u128(sum - q) } else { T::from_u128(sum) };
 
             chunk[j + t] = ((u + q - v) % q * w) % q;
         }
@@ -259,10 +251,8 @@ fn inverse_ntt_multi(
 
     let n_inv = mod_pow(n as u128, q - 2, q);
     for c in coeffs.iter_mut() {
-        *c = (*c * n_inv) % q;
+        *c = T::from_u128((c.to_u128() * n_inv) % q);
     }
 
-    Polynomial {
-        coeffs: coeffs.into_iter().map(|c| c as u64).collect::<Vec<_>>().into_boxed_slice(),
-    }
+    Polynomial::new_from_coeffs(coeffs)
 }

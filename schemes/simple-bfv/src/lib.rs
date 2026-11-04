@@ -10,11 +10,12 @@ pub use crate::find_parameters::find_valid_q as find_valid_q;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
+use simple_ring::Polynomial;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 
-
+pub type Poly64 = Polynomial<u64>;
 
 /*
 Tests for simple-bfv (yes I could have done a /tests)
@@ -24,7 +25,7 @@ use std::time::*;
 
 #[cfg(test)]
 //For separated key generation : a single function, so that it isn't to loud in the tests
-fn generate_keys(bfv: &BFV) -> (simple_ring::Polynomial, simple_ring::Polynomial, simple_ring::Polynomial) {
+fn generate_keys(bfv: &BFV) -> (Poly64, Poly64, Poly64) {
     let s = bfv.generate_secret_key();
     let a = bfv.generate_public_a();
     let b = bfv.generate_public_b(&a, &s);
@@ -33,12 +34,12 @@ fn generate_keys(bfv: &BFV) -> (simple_ring::Polynomial, simple_ring::Polynomial
 
 #[cfg(test)]
 //For asserting a plaintext and it's decoded one
-fn assert_plaintext_eq(got: &simple_ring::Polynomial, expected: &simple_ring::Polynomial, n_check: usize) {
-    for i in 0..n_check.min(got.coeffs.len()) {
+fn assert_plaintext_eq(got: &Poly64, expected: &Poly64, n_check: usize) {
+    for i in 0..n_check.min(got.len()) {
         assert_eq!(
-            got.coeffs[i], expected.coeffs[i],
+            got[i], expected[i],
             "Coefficient mismatch at index {}: got {}, expected {}",
-            i, got.coeffs[i], expected.coeffs[i]
+            i, got[i], expected[i]
         );
     }
 }

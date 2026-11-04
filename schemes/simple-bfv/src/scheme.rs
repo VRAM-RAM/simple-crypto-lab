@@ -1,10 +1,10 @@
-use crate::{BFV, plaintext::BFVPlaintext};
+use crate::{BFV, Poly64, plaintext::BFVPlaintext};
 use simple_ring::{Polynomial, generate_cbd_sample, generate_uniform_polynomial, generate_small_sample, RingParams};
 
 #[derive(Debug, Clone)]
 pub struct BFVCiphertext {
-    pub c0: Polynomial,
-    pub c1: Polynomial,
+    pub c0: Poly64,
+    pub c1: Poly64,
 }
 
 
@@ -22,7 +22,7 @@ impl BFV {
     This method reveals information about the secret key and plaintext (obviously, because you HAVE to give the secret key).
     Use ONLY for educational debugging in trusted environments. 
      */
-    pub fn estimate_noise(&self, secret_key: &Polynomial, params: &RingParams, ciphertext: &BFVCiphertext) -> u64 {
+    pub fn estimate_noise(&self, secret_key: &Poly64, params: &RingParams, ciphertext: &BFVCiphertext) -> u64 {
         let c1s = ciphertext.c1.mul_ntt(params, &self.ntt_precalculated, secret_key);
         let m_prime = ciphertext.c0.sub(params, &c1s);
         
@@ -30,7 +30,7 @@ impl BFV {
         let q = params.q as i128;
         let delta = (params.q / self.t) as i128; 
         
-        for &coeff in m_prime.coeffs.iter() {
+        for &coeff in m_prime.iter() {
             let centered = if coeff as i128 > q / 2 { 
                 coeff as i128 - q 
             } else { 

@@ -2,7 +2,7 @@ use std::ops::{AddAssign, Mul};
 
 use num::Zero;
 
-use crate::{Polynomial, traits::RingCompatible};
+use crate::{Polynomial, forward_ntt, inverse_ntt, ntt::NTTprecaculated, traits::RingCompatible};
 #[cfg(not(feature = "parallel"))]
 use crate::RingParams;
 
@@ -182,6 +182,31 @@ impl<T: RingCompatible + Zero + Clone + Mul<Output = T> + AddAssign + Copy> Poly
             .collect::<Vec<T>>();
 
         Polynomial::new_from_coeffs(new)
+    }
+
+    #[inline]
+    /// Computes the product of two polynomials by passing them in NTTs.
+    pub fn mul_ntt(&self, params: &RingParams, ntt_tables: &NTTprecaculated, polynomial: &Self) -> Self { 
+        assert_eq!(self.coeffs.len(), polynomial.coeffs.len(), "The length of the two polynomials you're trying to multiply doesn't match ! You may use parameters.n for both of the polynomials");
+        let a = forward_ntt(params, self, ntt_tables);
+        let b = forward_ntt(params, polynomial, ntt_tables);
+
+        let c_ntt = a.ring_pointwise_mul(params, &b);
+
+        inverse_ntt(params, &c_ntt, ntt_tables)
+        
+    }
+
+    #[inline]
+    /// Computes the pointwise mul of two Polynomials (a ◦ b)
+    pub fn ring_pointwise_mul(&self, params: &RingParams, polynomial: &Self) -> Self { 
+        let mut result = vec![T::zero(); params.n];
+
+        for i in 0..params.n {
+            result[i] = T::from_u128((self[i].to_u128() * polynomial[i].to_u128()) % params.q as u128);
+        }
+
+        Polynomial::new_from_coeffs(result)
     }
 
 }
