@@ -33,7 +33,7 @@ fn test_add_assign_operator() {
 #[test]
 fn test_add_assign_operator_different_lengths() {
     let mut sum = Polynomial::<u64>::zeros(2); // [0, 0]
-        println!("{:?}", sum);
+    println!("{:?}", sum);
 
     sum += Polynomial::new_from_coeffs(vec![1u64, 2, 3]); // [1, 2, 3]
 

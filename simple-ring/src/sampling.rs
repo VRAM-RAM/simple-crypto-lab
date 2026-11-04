@@ -1,6 +1,5 @@
 //! Code for sampling of polynomials, and generation of coefficients
 
-
 use crate::traits::RingCompatible;
 use crate::{Polynomial, RingParams};
 use rand::{Rng, RngCore, rngs::OsRng};
@@ -123,8 +122,8 @@ pub fn generate_uniform_polynomial<T: RingCompatible + Clone>(
     let mut rng = OsRng;
 
     let coeffs: Vec<T> = (0..params.n)
-      .map(|_| T::from_u64(rng.gen_range(0..params.q)))
-      .collect();
+        .map(|_| T::from_u64(rng.gen_range(0..params.q)))
+        .collect();
 
     Polynomial::new_from_coeffs(coeffs)
 }

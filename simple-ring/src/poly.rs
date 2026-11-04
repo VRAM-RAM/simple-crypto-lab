@@ -10,7 +10,6 @@ use bytemuck::Pod;
 use bytemuck::checked::cast_slice;
 use num::Zero;
 
-
 use serde::{Deserialize, Serialize};
 
 pub mod impls;
@@ -160,24 +159,21 @@ impl<T: Clone> Polynomial<T> {
     pub fn to_vec(&self) -> Vec<T> {
         self.coeffs.to_vec()
     }
-
-
-
 }
- 
+
 impl<T: Mul<Output = T> + Zero + Clone> Polynomial<T> {
     /// Evaluates the [`Polynomial`] at a point `x`.
-    /// 
+    ///
     /// ### Example
-    /// 
+    ///
     /// ```rust
     /// use simple_ring::*;
-    /// 
+    ///
     /// fn foo() {
     ///     let poly: Polynomial<i16> = poly![-1, 3, 17, 9, 3];
-    /// 
+    ///
     ///     let poly_5: i16 = poly.eval(5);
-    /// 
+    ///
     ///     assert_eq!(poly_5, 3439)
     /// }
     /// ```
@@ -185,7 +181,7 @@ impl<T: Mul<Output = T> + Zero + Clone> Polynomial<T> {
         let mut result = T::zero();
 
         for coeff in self.coeffs.iter().rev() {
-            result =  coeff.clone() + result * x.clone()
+            result = coeff.clone() + result * x.clone()
         }
 
         result

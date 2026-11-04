@@ -14,10 +14,10 @@
 //! ```
 //!
 //!
-//! ### Examples 
+//! ### Examples
 //!
 //! #### Using the 'basic' polynomials
-//! 
+//!
 //! You can use `simple-ring` to manipulate **Polynomials** as wanted. For example :
 //!
 //! ```rust
@@ -28,13 +28,13 @@
 //!     let poly_q = poly![2, -4, 1];
 //!
 //!     println!("P(2) = {}", poly_p.eval(2));
-//! 
+//!
 //!     println!("Q(-1) = {}", poly_q.eval(-1));
 //!
 //!     println!("A(x) = P(x) + Q(x) = {:?}", poly_p.clone() + poly_q.clone());
 //!
 //!     println!("B(x) = P(x) - Q(x) = {:?}", poly_p.clone() - poly_q);
-//! 
+//!
 //!     println!("C(x) = P(x) * 10 = {:?}", poly_p * 10);
 //! }
 //! ```
@@ -59,7 +59,7 @@
 //! use simple_ring::*;
 //!
 //! fn main() {
-//!     // Define the ring 
+//!     // Define the ring
 //!     let n = 4096;
 //!
 //!     // Yep, this is huge. To validate q, you can use `is_q_valid()`
@@ -67,7 +67,7 @@
 //!
 //!     let params = &RingParams::new(n, q, find_valid_omega(n, q) );
 //!
-//!     // Precompute the NTT tables 
+//!     // Precompute the NTT tables
 //!     let ntt_tables = &precalculate(params);
 //!     
 //!     // Generate a polynomial with a random definition, in the ring
@@ -83,7 +83,7 @@
 //!     let start = Instant::now();
 //!
 //!     let product = poly_1.ring_mul(params, &poly_2);
-//! 
+//!
 //!     let end = Instant::now();
 //!
 //!     let elapsed = end - start;
@@ -99,15 +99,15 @@
 //!     let end = Instant::now();
 //!
 //!     let elapsed = end - start;
-//! 
+//!
 //!     println!("Computed P1(x) * P2(x) in {} ms with NTT mul", elapsed.as_millis());
 //!
 //!     assert_eq!(product.to_vec(), product_with_ntt.to_vec());
 //! }
 //! ```
-//! 
-//! And it displays : 
-//! 
+//!
+//! And it displays :
+//!
 //! ```bash
 //! Computed P1(x) * P2(x) in 195 ms with naive mul
 //! Computed P1(x) * P2(x) in 2 ms with NTT mul
@@ -115,7 +115,7 @@
 //!
 //! > NTT really makes the difference on huge products
 //!
-//! #### Using directly the NTT, and built-in functions 
+//! #### Using directly the NTT, and built-in functions
 //!
 //! ```rust
 //! use std::time::Instant;
@@ -123,7 +123,7 @@
 //! use simple_ring::{RingParams, find_valid_omega, forward_ntt, inverse_ntt, mod_pow, precalculate, sampling::generate_cbd_sample};
 //!
 //! fn main() {
-//!     // Define the ring 
+//!     // Define the ring
 //!     let n = 4096;
 //!
 //!     // Yep, this is huge. To validate q, you can use `is_q_valid()`
@@ -131,7 +131,7 @@
 //!
 //!     let params = &RingParams::new(n, q, find_valid_omega(n, q) );
 //!
-//!     // Precompute the NTT tables 
+//!     // Precompute the NTT tables
 //!     let ntt_tables = &precalculate(params);
 //!     
 //!     // A sample generated using `Centered Binomial Distribution`
@@ -166,7 +166,7 @@
 //!     println!("1546^8889 mod {} = {} ; Computed in {} ns.", q, result, elapsed.as_nanos())
 //! }
 //! ```
-//! 
+//!
 //! And it displays :
 //!
 //! ```bash

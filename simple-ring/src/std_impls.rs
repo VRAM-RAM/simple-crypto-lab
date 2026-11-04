@@ -75,7 +75,6 @@ impl ToPoly<u8> for &[u8] {
 }
 
 impl RingCompatible for u8 {
-
     fn from_u128(value: u128) -> Self {
         value as u8
     }

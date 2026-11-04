@@ -1,10 +1,11 @@
-use std::ops::{AddAssign, Mul};
 use num::Zero;
+use std::ops::{AddAssign, Mul};
 
 use crate::RingParams;
 use crate::{Polynomial, forward_ntt, inverse_ntt, ntt::NTTprecaculated, traits::RingCompatible};
 
-impl<T: RingCompatible + Zero + Clone + Mul<Output = T> + Copy + PartialOrd + AddAssign> Polynomial<T> 
+impl<T: RingCompatible + Zero + Clone + Mul<Output = T> + Copy + PartialOrd + AddAssign>
+    Polynomial<T>
 {
     #[inline]
     /// Computes a `single-thread` sum of two [`Polynomial`]s, in the ring.
@@ -12,20 +13,25 @@ impl<T: RingCompatible + Zero + Clone + Mul<Output = T> + Copy + PartialOrd + Ad
     /// `T` needs to implement [`RingCompatible`], [`Zero`] and [`Clone`].
     ///
     /// The two polynomials should have the same length (`params.n`), and each coefficient is reduced by `q`.
-    /// 
+    ///
     /// Warning : the coefficients should belong to [0; q). If not, the method may overflow.
     pub fn ring_sum(&self, params: &RingParams, second: &Self) -> Self {
         let q = params.q;
 
-        Polynomial::new_from_coeffs(self.coeffs.iter()
-            .zip(second.coeffs.iter())
-            .map(|(a, b)| {
-                let (s, carry) = (a.to_u64()).overflowing_add(b.to_u64());
-                if carry || s >= q { T::from_u64(s.wrapping_sub(q)) } else { T::from_u64(s) }
-            })
-            .collect()
-        
-        ) 
+        Polynomial::new_from_coeffs(
+            self.coeffs
+                .iter()
+                .zip(second.coeffs.iter())
+                .map(|(a, b)| {
+                    let (s, carry) = (a.to_u64()).overflowing_add(b.to_u64());
+                    if carry || s >= q {
+                        T::from_u64(s.wrapping_sub(q))
+                    } else {
+                        T::from_u64(s)
+                    }
+                })
+                .collect(),
+        )
     }
 
     #[inline]
@@ -37,19 +43,18 @@ impl<T: RingCompatible + Zero + Clone + Mul<Output = T> + Copy + PartialOrd + Ad
     pub fn ring_sub(&self, params: &RingParams, second: &Self) -> Self {
         let q = params.q;
 
-        Polynomial::new_from_coeffs(self.coeffs.iter()
-            .zip(second.coeffs.iter())
-            .map(|(a, b)| {
-                let d = a.to_u64().wrapping_sub(b.to_u64()).wrapping_add(q);
+        Polynomial::new_from_coeffs(
+            self.coeffs
+                .iter()
+                .zip(second.coeffs.iter())
+                .map(|(a, b)| {
+                    let d = a.to_u64().wrapping_sub(b.to_u64()).wrapping_add(q);
 
-                T::from_u64(d % q)
-            })
-            .collect()
-        
-        ) 
+                    T::from_u64(d % q)
+                })
+                .collect(),
+        )
     }
-
-
 
     #[inline]
     // Function for naive multiplication in the ring, not to be used (except for small degrees)
@@ -79,7 +84,8 @@ impl<T: RingCompatible + Zero + Clone + Mul<Output = T> + Copy + PartialOrd + Ad
                 T::zero()
             };
 
-            let val = ((low.to_u64() as i128) - (high.to_u64() as i128)).rem_euclid(params.q as i128) as u64;
+            let val = ((low.to_u64() as i128) - (high.to_u64() as i128))
+                .rem_euclid(params.q as i128) as u64;
 
             coeffs[k] = T::from_u64(val);
         }
@@ -106,7 +112,13 @@ impl<T: RingCompatible + Zero + Clone + Mul<Output = T> + Copy + PartialOrd + Ad
         let coeffs: Vec<T> = self
             .coeffs
             .iter()
-            .map(|&coeff| if coeff.is_zero() { coeff } else { T::from_u64(q.wrapping_sub(coeff.to_u64())) })
+            .map(|&coeff| {
+                if coeff.is_zero() {
+                    coeff
+                } else {
+                    T::from_u64(q.wrapping_sub(coeff.to_u64()))
+                }
+            })
             .collect::<Vec<T>>();
 
         Polynomial::new_from_coeffs(coeffs)

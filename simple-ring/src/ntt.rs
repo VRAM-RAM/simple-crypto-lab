@@ -38,7 +38,6 @@ pub fn precalculate(params: &RingParams) -> NTTprecaculated {
     }
 }
 
-
 #[inline]
 pub fn forward_ntt<T: RingCompatible + Clone>(
     params: &RingParams,

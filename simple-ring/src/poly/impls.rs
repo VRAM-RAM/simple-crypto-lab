@@ -1,7 +1,7 @@
-use std::{cmp::{self, min}, ops::{
-    Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign,
-}};
-
+use std::{
+    cmp::{self, min},
+    ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign},
+};
 
 use num::Zero;
 
@@ -110,7 +110,7 @@ where
     fn sub(self, rhs: Self) -> Self::Output {
         let min_len = min(self.len(), rhs.len());
         let max_len = cmp::max(self.len(), rhs.len());
-        
+
         let mut sub = Vec::with_capacity(max_len);
 
         for i in 0..min_len {
@@ -246,14 +246,12 @@ where
 {
     #[inline]
     fn mul_assign(&mut self, rhs: Self) {
-
         let mut b = vec![T::zero(); 2 * self.len()];
-        
+
         for i in 0..self.len() {
             for j in 0..self.len() {
                 let k = i + j;
-                b[k] += self.coeffs[i]  * rhs.coeffs[j] ;
-
+                b[k] += self.coeffs[i] * rhs.coeffs[j];
             }
         }
     }
@@ -296,7 +294,6 @@ where
         }
     }
 }
-
 
 impl<T> Neg for Polynomial<T>
 where
