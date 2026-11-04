@@ -9,7 +9,11 @@ fn log2_ceil(q: u64) -> u32 {
 }
 
 impl RingParams {
-    pub fn encode_a<T: RingCompatible + Clone>(&self, seed: &[u8; 32], b: &Polynomial<T>) -> Vec<u8> {
+    pub fn encode_a<T: RingCompatible + Clone>(
+        &self,
+        seed: &[u8; 32],
+        b: &Polynomial<T>,
+    ) -> Vec<u8> {
         let mut writer = BitWriter::new(1792 + 32);
 
         for &byte in seed {
@@ -50,7 +54,6 @@ impl RingParams {
 
         (seed, Polynomial::new_from_coeffs(b))
     }
-
 
     pub fn encode_b<T: RingCompatible + Clone>(&self, u: &Polynomial<T>, r: &Vec<u8>) -> Vec<u8> {
         let mut writer = BitWriter::new(2048);

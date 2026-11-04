@@ -1,19 +1,15 @@
 #![forbid(unsafe_code)]
-mod scheme;
 mod config;
-mod plaintext;
 mod find_parameters;
+mod plaintext;
+mod scheme;
 
-pub use crate::config::BFV as BFV;
+pub use crate::config::BFV;
+pub use crate::find_parameters::find_valid_q;
 pub use crate::plaintext::BFVPlaintext;
-pub use crate::find_parameters::find_valid_q as find_valid_q;
-
-#[cfg(feature = "parallel")]
-use rayon::prelude::*;
 use simple_ring::Polynomial;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 
 pub type Poly64 = Polynomial<u64>;
 
@@ -44,16 +40,15 @@ fn assert_plaintext_eq(got: &Poly64, expected: &Poly64, n_check: usize) {
     }
 }
 
-
 #[test]
 //Basic test for only encryption + decryption
 fn basic() {
-    let bfv = BFV::for_medium(); 
+    let bfv = BFV::for_medium();
     let (public_a, public_b, secret_s) = generate_keys(&bfv);
 
     let message = BFVPlaintext::new(
         "Hello, this is BFV scheme. This basic test is here to ensure that we can encrypt special characters, as #{[|@*$ù%§! and others, like µ~'</&œ. If you want to see it totally, use for_large or for_medium.",
-        &bfv
+        &bfv,
     );
 
     let start = Instant::now();
@@ -65,12 +60,11 @@ fn basic() {
     println!("Elapsed: {:?}", start.elapsed());
 
     assert_eq!(
-        bfv.backend_decrypt(&ciphertext, &secret_s).coeffs,
-        message.plain.coeffs,
+        bfv.backend_decrypt(&ciphertext, &secret_s).to_vec(),
+        message.plain.to_vec(),
         "Decryption mismatch"
     );
 }
-
 
 //Homomorphic tests
 
@@ -93,7 +87,7 @@ fn test_cipher_addition() {
     let result = bfv.backend_decrypt(&ct_sum, &sk);
 
     for i in 0..n.min(50) {
-        assert_eq!(result.coeffs[i], 252, "Addition failed at index {}", i);
+        assert_eq!(result[i], 252, "Addition failed at index {}", i);
     }
 
     let s3 = String::from_utf8(vec![64u8; 50]).unwrap();
@@ -107,7 +101,7 @@ fn test_cipher_addition() {
     let result2 = bfv.backend_decrypt(&ct_sum2, &sk);
 
     for i in 0..50 {
-        assert_eq!(result2.coeffs[i], 128, "Addition failed at index {}", i);
+        assert_eq!(result2[i], 128, "Addition failed at index {}", i);
     }
 }
 
@@ -121,13 +115,10 @@ fn test_add_cipher_plain() {
     let pt2 = BFVPlaintext::new_from_coeffs(vec![30u64; n], &bfv);
 
     let ct1 = bfv.encrypt(&pt1, &pk_a, &pk_b);
-    let result = bfv.backend_decrypt(
-        &bfv.sum_ciphertext_and_plaintext(&ct1, &pt2),
-        &sk
-    );
+    let result = bfv.backend_decrypt(&bfv.sum_ciphertext_and_plaintext(&ct1, &pt2), &sk);
 
     for i in 0..n.min(50) {
-        assert_eq!(result.coeffs[i], 90, "C+P addition failed at index {}", i);
+        assert_eq!(result[i], 90, "C+P addition failed at index {}", i);
     }
 }
 
@@ -145,13 +136,10 @@ fn test_mul_cipher_plain() {
 
     let ct1 = bfv.encrypt(&pt1, &pk_a, &pk_b);
 
-    let result = bfv.backend_decrypt(
-        &bfv.mul_ciphertext_and_plaintext(&ct1, &pt_scalar),
-        &sk
-    );
+    let result = bfv.backend_decrypt(&bfv.mul_ciphertext_and_plaintext(&ct1, &pt_scalar), &sk);
 
     for i in 0..n.min(50) {
-        assert_eq!(result.coeffs[i], 30, "C*P multiplication failed at index {}", i);
+        assert_eq!(result[i], 30, "C*P multiplication failed at index {}", i);
     }
 }
 
@@ -176,7 +164,7 @@ fn test_add_then_mul() {
     let result = bfv.backend_decrypt(&ct_res, &sk);
 
     for i in 0..50 {
-        assert_eq!(result.coeffs[i], 90, "(A+B)*C failed at index {}", i);
+        assert_eq!(result[i], 90, "(A+B)*C failed at index {}", i);
     }
 }
 
@@ -192,16 +180,13 @@ fn test_mul_then_add() {
     s[0] = 4;
     let pt_s = BFVPlaintext::new_from_coeffs(s, &bfv);
 
-    let ct_mul = bfv.mul_ciphertext_and_plaintext(
-        &bfv.encrypt(&pt5, &pk_a, &pk_b),
-        &pt_s,
-    );
+    let ct_mul = bfv.mul_ciphertext_and_plaintext(&bfv.encrypt(&pt5, &pk_a, &pk_b), &pt_s);
 
     let ct_res = bfv.sum_ciphertexts(ct_mul, bfv.encrypt(&pt7, &pk_a, &pk_b));
     let result = bfv.backend_decrypt(&ct_res, &sk);
 
     for i in 0..50 {
-        assert_eq!(result.coeffs[i], 27, "A*B+C failed at index {}", i);
+        assert_eq!(result[i], 27, "A*B+C failed at index {}", i);
     }
 }
 
@@ -215,16 +200,13 @@ fn test_chained_additions() {
     let mut acc = bfv.encrypt(&pt, &pk_a, &pk_b);
 
     for _ in 1..10 {
-        acc = bfv.sum_ciphertexts(
-            acc,
-            bfv.encrypt(&pt, &pk_a, &pk_b)
-        );
+        acc = bfv.sum_ciphertexts(acc, bfv.encrypt(&pt, &pk_a, &pk_b));
     }
 
     let result = bfv.backend_decrypt(&acc, &sk);
 
     for i in 0..50 {
-        assert_eq!(result.coeffs[i], 10, "Chained addition failed at index {}", i);
+        assert_eq!(result[i], 10, "Chained addition failed at index {}", i);
     }
 }
 
@@ -244,7 +226,7 @@ fn test_edge_zero() {
     let result = bfv.backend_decrypt(&ct, &sk);
 
     for i in 0..50 {
-        assert_eq!(result.coeffs[i], 128, "Zero addition failed at index {}", i);
+        assert_eq!(result[i], 128, "Zero addition failed at index {}", i);
     }
 }
 
@@ -258,7 +240,7 @@ fn test_edge_max_value() {
     let result = bfv.backend_decrypt(&ct, &sk);
 
     for i in 0..50 {
-        assert_eq!(result.coeffs[i], 255, "Max value decryption failed at index {}", i);
+        assert_eq!(result[i], 255, "Max value decryption failed at index {}", i);
     }
 }
 
@@ -280,7 +262,7 @@ fn test_edge_add_one_to_max() {
     let result = bfv.backend_decrypt(&ct, &sk);
 
     for i in 0..50 {
-        assert_eq!(result.coeffs[i], 0, "Overflow wrap failed at index {}", i);
+        assert_eq!(result[i], 0, "Overflow wrap failed at index {}", i);
     }
 }
 
@@ -298,7 +280,11 @@ fn test_roundtrip_full_coeffs() {
     let ciphertext = bfv.encrypt(&plaintext, &pk_a, &pk_b);
     let recovered = bfv.backend_decrypt(&ciphertext, &sk);
 
-    assert_eq!(recovered.coeffs, plaintext.plain.coeffs, "Full roundtrip failed");
+    assert_eq!(
+        recovered.to_vec(),
+        plaintext.plain.to_vec(),
+        "Full roundtrip failed"
+    );
 }
 
 #[test]
@@ -336,14 +322,18 @@ fn test_roundtrip_binary_plaintext() {
     let ciphertext = bfv.encrypt(&plaintext, &pk_a, &pk_b);
     let recovered = bfv.backend_decrypt(&ciphertext, &sk);
 
-    assert_eq!(recovered.coeffs, plaintext.plain.coeffs, "Binary roundtrip failed");
+    assert_eq!(
+        recovered.to_vec(),
+        plaintext.plain.to_vec(),
+        "Binary roundtrip failed"
+    );
 }
 
 //Noise "budget" tests :
 
 #[test]
 fn test_noise_budget_additions() {
-    let bfv = BFV::for_medium(); 
+    let bfv = BFV::for_medium();
     let (pk_a, pk_b, sk) = generate_keys(&bfv);
     let n = bfv.params.n;
 
@@ -354,56 +344,74 @@ fn test_noise_budget_additions() {
     for i in 1..=100 {
         ct = bfv.sum_ciphertexts(ct.clone(), ct.clone());
         let result = bfv.backend_decrypt(&ct, &sk);
-        
-        let expected = (1u64 << i.min(7)) % bfv.t; 
-        
-        if result.coeffs[0] == expected {
+
+        let expected = (1u64 << i.min(7)) % bfv.t;
+
+        if result[0] == expected {
             success_count = i;
         } else {
-            println!("Decryption failed after {} additions: got {}, expected {}", 
-                     i, result.coeffs[0], expected);
+            println!(
+                "Decryption failed after {} additions: got {}, expected {}",
+                i, result[0], expected
+            );
             break;
         }
     }
 
-    println!("Successful additions before noise failure: {}", success_count);
-    assert!(success_count >= 5, "Noise budget too small: failed after {} additions", success_count);
+    println!(
+        "Successful additions before noise failure: {}",
+        success_count
+    );
+    assert!(
+        success_count >= 5,
+        "Noise budget too small: failed after {} additions",
+        success_count
+    );
 }
 
 #[test]
 fn test_noise_budget_multiplications() {
-    let bfv = BFV::for_large(); 
+    let bfv = BFV::for_large();
     let (pk_a, pk_b, sk) = generate_keys(&bfv);
     let n = bfv.params.n;
 
     let mut m = vec![0u64; n];
-    m[0] = 2;  
+    m[0] = 2;
     let pt = BFVPlaintext::new_from_coeffs(m, &bfv);
 
     let mut scalar = vec![0u64; n];
-    scalar[0] = 2;  
+    scalar[0] = 2;
     let pt_scalar = BFVPlaintext::new_from_coeffs(scalar, &bfv);
-    
+
     let mut ct = bfv.encrypt(&pt, &pk_a, &pk_b);
 
     let mut success_count = 0;
     for i in 1..=15 {
         ct = bfv.mul_ciphertext_and_plaintext(&ct, &pt_scalar);
         let result = bfv.backend_decrypt(&ct, &sk);
-        
+
         let expected = (2u64.pow(i as u32 + 1)) % bfv.t;
-        
-        if result.coeffs[0] == expected {
+
+        if result[0] == expected {
             success_count = i;
         } else {
-            println!("Decryption failed after {} multiplications: got {}, expected {}", 
-                     i, result.coeffs[0], expected);
+            println!(
+                "Decryption failed after {} multiplications: got {}, expected {}",
+                i, result[0], expected
+            );
             break;
         }
     }
 
-    println!("Successful multiplications before noise failure: {}", success_count);
-    assert!(success_count >= 8, "Failed after {} multiplications", success_count);
+    println!(
+        "Successful multiplications before noise failure: {}",
+        success_count
+    );
+    assert!(
+        success_count >= 8,
+        "Failed after {} multiplications",
+        success_count
+    );
 }
 
 #[test]
@@ -428,10 +436,17 @@ fn test_noise_budget_mixed_operations() {
         operations += 1;
 
         let result = bfv.backend_decrypt(&ct, &sk);
-        assert!(result.coeffs[0] < bfv.t, "Decryption overflow after {} ops", operations);
+        assert!(
+            result[0] < bfv.t,
+            "Decryption overflow after {} ops",
+            operations
+        );
     }
 
-    println!("Completed {} mixed operations without decryption failure", operations);
+    println!(
+        "Completed {} mixed operations without decryption failure",
+        operations
+    );
 }
 
 //Noise estimation tests
@@ -463,51 +478,58 @@ fn test_noise_vs_delta_threshold() {
     let n = bfv.params.n;
 
     let delta = bfv.params.q / bfv.t;
-    let threshold = delta / 2;  
+    let threshold = delta / 2;
 
     let pt = BFVPlaintext::new_from_coeffs(vec![1u64; n], &bfv);
     let mut ct = bfv.encrypt(&pt, &pk_a, &pk_b);
 
     for i in 0..50 {
         let noise = bfv.estimate_noise(&sk, &bfv.params, &ct);
-        
+
         if noise < threshold {
             // Décryption devrait fonctionner
             let result = bfv.backend_decrypt(&ct, &sk);
-            assert!(result.coeffs[0] < bfv.t, "Decryption failed while noise < threshold");
+            assert!(
+                result[0] < bfv.t,
+                "Decryption failed while noise < threshold"
+            );
         } else {
-            println!("Noise exceeded threshold ({}) after {} additions: {}", threshold, i, noise);
+            println!(
+                "Noise exceeded threshold ({}) after {} additions: {}",
+                threshold, i, noise
+            );
             break;
         }
-        
+
         ct = bfv.sum_ciphertexts(ct.clone(), ct.clone());
     }
 }
 
-
 //Parameters validation tests
 
 #[test]
-#[should_panic(expected = "NTT requires n to be a power of 2, got 1028 ! For explanations, please read '/docs/simple-ring.pdf")]
+#[should_panic(
+    expected = "NTT requires n to be a power of 2, got 1028 ! For explanations, please read '/docs/simple-ring.pdf"
+)]
 fn test_invalid_n_not_power_of_two() {
     let _ = simple_ring::RingParams::new(1028, 786_433, 1);
 }
 
 #[test]
 fn test_valid_configurations() {
-    BFV::for_test();   
-    BFV::for_medium(); 
-    BFV::for_large();  
+    BFV::for_test();
+    BFV::for_medium();
+    BFV::for_large();
 }
 
 #[test]
 fn test_parameter_consistency() {
     let bfv = BFV::for_test();
-    
+
     assert!(bfv.params.n.is_power_of_two());
     assert!(bfv.t >= 2 && bfv.t < bfv.params.q);
     assert!(bfv.eta >= 1 && bfv.eta <= 16);
-    
+
     assert_eq!(bfv.ntt_precalculated.twiddles.len(), bfv.params.n);
     assert_eq!(bfv.ntt_precalculated.twiddles_inv.len(), bfv.params.n);
 }
@@ -517,25 +539,33 @@ fn test_parameter_consistency() {
 #[test]
 #[ignore] //Ignore by default, it can be really slow 
 fn test_performance_encrypt_decrypt() {
-    let bfv = BFV::for_large(); 
+    let bfv = BFV::for_large();
     let (pk_a, pk_b, sk) = generate_keys(&bfv);
-    
+
     let message = BFVPlaintext::new_from_coeffs(vec![42u64; bfv.params.n], &bfv);
-    
+
     let start = Instant::now();
     let ct = bfv.encrypt(&message, &pk_a, &pk_b);
     let enc_time = start.elapsed();
-    
+
     let start = Instant::now();
     let _ = bfv.backend_decrypt(&ct, &sk);
     let dec_time = start.elapsed();
-    
+
     println!("Encrypt time (n=4096): {:?}", enc_time);
     println!("Decrypt time (n=4096): {:?}", dec_time);
-    
+
     // Seuils approximatifs (à ajuster selon ta machine)
-    assert!(enc_time.as_millis() < 100, "Encryption too slow: {:?}", enc_time);
-    assert!(dec_time.as_millis() < 100, "Decryption too slow: {:?}", dec_time);
+    assert!(
+        enc_time.as_millis() < 100,
+        "Encryption too slow: {:?}",
+        enc_time
+    );
+    assert!(
+        dec_time.as_millis() < 100,
+        "Decryption too slow: {:?}",
+        dec_time
+    );
 }
 
 #[test]
@@ -543,68 +573,79 @@ fn test_performance_encrypt_decrypt() {
 fn test_performance_homomorphic_add() {
     let bfv = BFV::for_large();
     let (pk_a, pk_b, _sk) = generate_keys(&bfv);
-    
+
     let pt = BFVPlaintext::new_from_coeffs(vec![1u64; bfv.params.n], &bfv);
     let ct1 = bfv.encrypt(&pt, &pk_a, &pk_b);
     let ct2 = bfv.encrypt(&pt, &pk_a, &pk_b);
-    
+
     let start = Instant::now();
     let _ = bfv.sum_ciphertexts(ct1, ct2);
     let add_time = start.elapsed();
-    
-    println!("Homomorphic add time (n=4096): {:?}", add_time);
-    assert!(add_time.as_millis() < 50, "Addition too slow: {:?}", add_time);
-}
 
+    println!("Homomorphic add time (n=4096): {:?}", add_time);
+    assert!(
+        add_time.as_millis() < 50,
+        "Addition too slow: {:?}",
+        add_time
+    );
+}
 
 //Other tests :
 
 #[test]
-fn test_empty_plaintext() { //Just encrypt empty plaintexts
+fn test_empty_plaintext() {
+    //Just encrypt empty plaintexts
     let bfv = BFV::for_test();
     let (pk_a, pk_b, sk) = generate_keys(&bfv);
-    
+
     let pt = BFVPlaintext::new_from_coeffs(vec![0u64; bfv.params.n], &bfv);
     let ct = bfv.encrypt(&pt, &pk_a, &pk_b);
     let result = bfv.backend_decrypt(&ct, &sk);
-    
+
     for i in 0..50 {
-        assert_eq!(result.coeffs[i], 0, "Empty plaintext decryption failed");
+        assert_eq!(result[i], 0, "Empty plaintext decryption failed");
     }
 }
 
 #[test]
-fn test_single_coefficient_nonzero() { 
+fn test_single_coefficient_nonzero() {
     let bfv = BFV::for_test();
     let (pk_a, pk_b, sk) = generate_keys(&bfv);
     let n = bfv.params.n;
-    
+
     let mut coeffs = vec![0u64; n];
-    coeffs[n/2] = 123; 
-    
+    coeffs[n / 2] = 123;
+
     let pt = BFVPlaintext::new_from_coeffs(coeffs.clone(), &bfv);
     let ct = bfv.encrypt(&pt, &pk_a, &pk_b);
     let result = bfv.backend_decrypt(&ct, &sk);
-    
-    assert_eq!(result.coeffs[n/2], 123, "Single coefficient decryption failed");
+
+    assert_eq!(result[n / 2], 123, "Single coefficient decryption failed");
 }
 
 #[test]
 fn test_deterministic_encryption_with_same_randomness() {
     // BFV is probabilistic : even with the same keys, because of the noise, a plaintext shouldn't give two same ciphertexts
-    
+
     let bfv = BFV::for_test();
     let (pk_a, pk_b, sk) = generate_keys(&bfv);
-    
+
     let pt = BFVPlaintext::new_from_coeffs(vec![42u64; bfv.params.n], &bfv);
-    
+
     let ct1 = bfv.encrypt(&pt, &pk_a, &pk_b);
     let ct2 = bfv.encrypt(&pt, &pk_a, &pk_b);
-    
-    assert_ne!(ct1.c0.coeffs, ct2.c0.coeffs, "Encryption should be probabilistic");
-    
+
+    assert_ne!(
+        ct1.c0.to_vec(),
+        ct2.c0.to_vec(),
+        "Encryption should be probabilistic"
+    );
+
     let res1 = bfv.backend_decrypt(&ct1, &sk);
     let res2 = bfv.backend_decrypt(&ct2, &sk);
-    assert_eq!(res1.coeffs, res2.coeffs, "Decryption should be deterministic");
+    assert_eq!(
+        res1.to_vec(),
+        res2.to_vec(),
+        "Decryption should be deterministic"
+    );
 }
-

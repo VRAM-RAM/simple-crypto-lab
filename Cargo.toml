@@ -4,12 +4,12 @@ members = [
     "simple-ring",
     "schemes/simple-bfv",
     "schemes/simple-saber",
+    "examples/ring"
 ]
 
 [workspace.dependencies]
 rand = "0.8.0"
-rayon = "1.11.0"
-simple-ring = "0.2.0"
+simple-ring = { version = "0.3.0" }
 
 [workspace.package]
 edition = "2024"

@@ -1,14 +1,16 @@
+//! Code for sampling of polynomials, and generation of coefficients
+
+
 use crate::traits::RingCompatible;
-//Code for sampling of polynomials, and generation of coefficients
 use crate::{Polynomial, RingParams};
 use rand::{Rng, RngCore, rngs::OsRng};
+use shake::Shake128;
+use shake::digest::{ExtendableOutput, Update, XofReader};
 use std::ops::Deref;
-use shake::{Shake128};
-use shake::digest::{Update, ExtendableOutput, XofReader};
 
 pub enum SeedType {
     NotGiven,
-    Given([u8; 32])
+    Given([u8; 32]),
 }
 
 #[derive(Clone, Debug)]
@@ -23,18 +25,21 @@ impl Deref for Sample {
 }
 
 impl Sample {
-    pub fn to_poly<T: Clone + Into<i128> + From<i128>>(self, q: T) -> Polynomial<T> {
-        let coeffs = self.iter().map(|v| (*v as i128).rem_euclid(q.clone().into()).into()).collect();
+    pub fn to_poly_64(self, q: u64) -> Polynomial<u64> {
+        let coeffs = self
+            .iter()
+            .map(|v| (*v as i128).rem_euclid(q as i128) as u64)
+            .collect();
         Polynomial::new_from_coeffs(coeffs)
     }
 }
 
-impl Polynomial<u8> {
+impl Polynomial<u64> {
     pub fn random_binary(n: usize) -> Self {
-        let mut coeffs = vec![0u8; n];
+        let mut coeffs = vec![0u64; n];
 
         for c in coeffs.iter_mut() {
-        *c = OsRng.gen_range(0..=1);
+            *c = OsRng.gen_range(0..=1);
         }
 
         Polynomial::new_from_coeffs(coeffs)
@@ -43,29 +48,28 @@ impl Polynomial<u8> {
 
 #[inline]
 /// Returns a Centered Binomial Distribution sample
-/// 
+///
 /// This is how it works (on the left, explanations and on the right, example) :
-/// 
+///
 /// For each coefficient, we randomly choose bits for two parts, a and b.           
-/// 
+///
 /// `a = [0, 1, 1, 1]`           `b = [1, 0, 1, 1]`    
-/// 
+///
 /// Then, we sum this coefficients for each part.                                   
-/// 
+///
 /// `a = 0 + 1 + 1 + 1 = 3`      `b = 1 + 0 + 1 + 1 = 3`
-/// 
+///
 /// Finally, the value of our coefficient is equal to a - b                         
-/// 
+///
 /// `coeff = a - b = 3 - 3 = 0`
 pub fn generate_cbd_sample(n: usize, eta: usize) -> Sample {
-
     let mut coeffs = vec![0i32; n]; // So first we create an empty vector which will contain the coefficients.
 
     let bits_per_coeff = eta; //Then we choose the number of bits for each part (a and b) -> if bit_number == 4, a and be will be the sum of 4 bits, like in the example
 
-    let total_bits = 2 * coeffs.len() * bits_per_coeff; 
+    let total_bits = 2 * coeffs.len() * bits_per_coeff;
 
-    let total_bytes = (total_bits + 7) / 8; 
+    let total_bytes = (total_bits + 7) / 8;
 
     let mut rng_buf = vec![0u8; total_bytes];
 
@@ -75,14 +79,16 @@ pub fn generate_cbd_sample(n: usize, eta: usize) -> Sample {
         let mut a = 0;
         let mut b = 0;
 
-        for _ in 0..bits_per_coeff { //Then we choose the bits in the sequence of bytes generated before. (for example : generated = [00001111; 10101010; ...], then we pick the bits one by one as first bit = 0, second one = 0...)
+        for _ in 0..bits_per_coeff {
+            //Then we choose the bits in the sequence of bytes generated before. (for example : generated = [00001111; 10101010; ...], then we pick the bits one by one as first bit = 0, second one = 0...)
             let byte = rng_buf[bit_index / 8];
-            let bit = (byte >> (bit_index % 8)) & 1; 
+            let bit = (byte >> (bit_index % 8)) & 1;
             a += bit as u64;
             bit_index += 1;
         }
 
-        for _ in 0..bits_per_coeff { //We continue picking
+        for _ in 0..bits_per_coeff {
+            //We continue picking
             let byte = rng_buf[bit_index / 8];
             let bit = (byte >> (bit_index % 8)) & 1;
             b += bit as u64;
@@ -91,35 +97,34 @@ pub fn generate_cbd_sample(n: usize, eta: usize) -> Sample {
 
         *coeff = a as i32 - b as i32; //And we finally do a - b
     }
-    
+
     Sample(coeffs)
 }
-
 
 #[inline]
 /// Generates the small-coeffs sample (`[-1; 1]`)
 pub fn generate_small_sample(params: &RingParams) -> Sample {
-    let mut rng = OsRng; 
+    let mut rng = OsRng;
     let mut coeffs: Vec<i32> = Vec::with_capacity(params.n);
-    
+
     for _ in 0..params.n {
         let small: i32 = rng.gen_range(-1..=1); //We generate coeffs in the alphabet A = {-1, 0, 1}
         coeffs.push(small);
     }
-    
+
     Sample(coeffs)
 }
 
 #[inline]
-// Generates a polynomial with uniform distribution, in the ring
-pub fn generate_uniform_polynomial<T: RingCompatible + Clone>(params: &RingParams) -> Polynomial<T> {
+/// Generates a polynomial with uniform distribution, in the ring
+pub fn generate_uniform_polynomial<T: RingCompatible + Clone>(
+    params: &RingParams,
+) -> Polynomial<T> {
     let mut rng = OsRng;
-    let mut coeffs = Vec::with_capacity(params.n);
 
-    for _ in 0..params.n {
-        let uniform: T = T::from_u64(rng.gen_range(0u64..=params.q - 1u64)); // We generate values that are in the ring 
-        coeffs.push(uniform);
-    }
+    let coeffs: Vec<T> = (0..params.n)
+      .map(|_| T::from_u64(rng.gen_range(0..params.q)))
+      .collect();
 
     Polynomial::new_from_coeffs(coeffs)
 }
@@ -132,24 +137,18 @@ pub fn generate_then_shake(params: &RingParams, seed_type: SeedType) -> (Sample,
     match seed_type {
         SeedType::Given(seed) => {
             let buf = shake_128(seed, params.n);
-            let coeffs: Vec<i32> = buf
-                .into_iter()
-                .map(|b| (b as i32) - 128) 
-                .collect(); 
-            
-            return (Sample(coeffs), seed)
+            let coeffs: Vec<i32> = buf.into_iter().map(|b| (b as i32) - 128).collect();
+
+            return (Sample(coeffs), seed);
         }
 
         SeedType::NotGiven => {
             let mut seed = [0u8; 32];
             rng.fill_bytes(&mut seed);
             let buf = shake_128(seed, params.n);
-            let coeffs: Vec<i32> = buf
-                .into_iter()
-                .map(|b| (b as i32) - 128) 
-                .collect(); 
-            
-            return (Sample(coeffs), seed)
+            let coeffs: Vec<i32> = buf.into_iter().map(|b| (b as i32) - 128).collect();
+
+            return (Sample(coeffs), seed);
         }
     }
 }
@@ -163,4 +162,4 @@ pub fn shake_128(seed: [u8; 32], n: usize) -> Vec<u8> {
     let mut buf = vec![0u8; n];
     reader.read(&mut buf);
     buf
-} 
+}
